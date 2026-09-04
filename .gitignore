@@ -69,3 +69,6 @@ frontend/node_modules/
 # of every metric the README cites, and the ML layer degrades gracefully when the binaries
 # are absent (the physics path never depends on them).
 models/*.joblib
+
+# TypeScript incremental build cache
+*.tsbuildinfo

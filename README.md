@@ -16,6 +16,32 @@ margin than the route a ship would otherwise sail.
 
 ---
 
+## Problem statement
+
+| Field | Detail |
+| :--- | :--- |
+| **Problem Statement ID** | 26059 |
+| **Title** | AI-Enabled Antarctic Sea-Ice, Iceberg Trajectory, and Navigation Decision Support System |
+| **Theme** | Transportation & Logistics |
+| **Category** | Software |
+| **Organisation** | Ministry of Earth Sciences (MoES) |
+| **Department** | National Centre for Polar and Ocean Research (NCPOR) |
+| **Solution name** | POLAR-NAV AI |
+| **Team name** | _fill in_ |
+| **Team ID** | _fill in_ |
+
+**The ask.** Develop an AI/ML-enabled decision support platform capable of forecasting Antarctic
+sea-ice concentration, predicting iceberg trajectories, and identifying safe and fuel-efficient
+navigation routes for research vessels using satellite, oceanographic and meteorological datasets.
+
+**What is delivered.** All four capabilities, running end to end: a sea-ice analysis and forecast
+that beats persistence, an RK4 Lagrangian iceberg drift model with ensembles, a
+POLARIS-constrained route optimiser measured honestly against an ice-blind baseline, and a bridge
+console that sails the plan hour by hour with live alerting. Plus three trained models, of which
+one is good enough to use and two are reported as failures.
+
+---
+
 ## Read this first: what is real and what is simulated
 
 This is the part most prototypes are vague about, so it goes at the top.
@@ -64,8 +90,96 @@ walkthrough with the numbers, the order to show them in, and the questions worth
 python -m src.cli                 # full run: POLARIS, Lindqvist, ice, icebergs, route, voyage
 python -m src.cli --quick         # skip the voyage simulation
 python -m src.cli --list          # available legs, vessels and stations
-python -m pytest tests/ -q        # the test suite
 ```
+
+---
+
+## How to check the prototype is actually working
+
+Six checks, in order. Each one prints something you can compare against the expected result, so
+you can tell the difference between "it started" and "it works".
+
+### 1. The test suite
+
+```bash
+python -m pytest tests/ -q
+```
+
+Expect **106 passed**. This covers the geodesy and its inverse projection, the land mask, ice
+physics bounds, forecast skill against persistence, Lindqvist monotonicity, radar determinism,
+and that the route optimiser's saving is consistent with its two route evaluations.
+
+### 2. The backend is up and honest about itself
+
+```bash
+uvicorn src.api.main:app --port 8000
+curl http://127.0.0.1:8000/api/v1/health
+```
+
+Expect `"status": "ok"` plus a `data_provenance` block naming, per layer, whether it is `real` or
+`synthetic`. Interactive API docs are at **http://localhost:8000/docs**.
+
+### 3. The land mask is real geometry, not a bounding box
+
+```bash
+curl "http://127.0.0.1:8000/api/v1/geo/point?lat=-70.7667&lon=11.7333"   # Maitri
+curl "http://127.0.0.1:8000/api/v1/geo/point?lat=-60&lon=20"             # open ocean
+```
+
+Maitri returns `"is_land": true` — it sits about 80 km inland — and the open-ocean point returns
+`false` with roughly 606 nm of coastal clearance. The `epsg3031` block round-trips back to the
+input coordinates, which is the projection check.
+
+### 4. The forecast beats persistence
+
+```bash
+curl "http://127.0.0.1:8000/api/v1/ice/forecast-skill"
+```
+
+Expect `skill_score_vs_persistence` **positive at every lead from 24 h**, rising to about +0.17 at
+120 h. A forecast that cannot beat "assume nothing changes" is not a forecast, so this is the one
+number that matters most.
+
+### 5. A route is planned, and the saving is a real difference
+
+```bash
+python -m src.cli --quick     # then read section [5]
+```
+
+Expect roughly, for Cape Town to Bharati:
+
+```
+Ice-blind shortest navigable route     2853 nm   719 h   301 t   minRIO  6
+POLARIS-constrained optimised route    3018 nm   306 h   292 t   minRIO 12
+Fuel saved 2.83 %   Time saved 412.9 h (17.2 days)
+```
+
+The two routes are planned independently and both sailed through identical physics. Change the
+leg to `--leg capetown_maitri` and the fuel saving goes **negative** — that is the system telling
+the truth rather than a bug.
+
+### 6. The bridge console renders
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+Open **http://localhost:5173**. You should see the Antarctic coastline in polar stereographic
+projection with a sea-ice raster over it, and the amber provenance bar stating which layers are
+simulated. Press **Plan voyage** on the Voyage Planner tab (allow 15 to 30 seconds), then
+**Start voyage** on the Bridge Console to watch the ship sail, slow down in the ice, and raise
+alerts.
+
+`npm run build` should complete with **zero TypeScript errors**.
+
+### Troubleshooting
+
+| Symptom | Cause |
+| :--- | :--- |
+| Frontend loads but every panel is empty | Backend is not running on port 8000. The header shows "Backend offline". |
+| Planning seems to hang | First plan builds lookup tables and integrates iceberg tracks: 30 s cold, about 12 s after. |
+| `ModuleNotFoundError: src` | Run from the repository root, not from inside `src/`. |
+| ML section of `/health` says "not trained" | Expected on a fresh clone. Run `python -m scripts.train`; the physics path does not depend on it. |
 
 ---
 
@@ -409,6 +523,61 @@ Interactive documentation at `http://localhost:8000/docs`.
 | GET | `/api/v1/telemetry/bandwidth` | the measured satellite budget |
 
 Backwards compatible: every v0.1 endpoint and request body still works.
+
+---
+
+## Feasibility and viability
+
+**Technical.** Every input the production system needs is a mature, free, operationally-supported
+data product: OSI-SAF OSI-401-b, AMSR2, Sentinel-1 SAR, ECMWF ERA5/HRES, Copernicus Marine, and
+the USNIC iceberg database. Nothing here depends on a commercial feed or a research prototype.
+The models run on CPU — no GPU appears anywhere in the stack — because the target hardware is a
+ruggedised PC on a ship's bridge.
+
+**Operational.** Maritime regulation forbids installing unapproved software inside a
+type-approved ECDIS. The console therefore runs on separate hardware and exports **GPX 1.1**,
+GeoJSON and an S-411-shaped ice overlay over the ship's LAN, which the ECDIS loads read-only.
+Communications are the other hard constraint: south of 60°S there is no geostationary coverage,
+so the system is built to work over Iridium Certus at a **measured 23.4 KB/day**.
+
+**Economic.** Open-source stack, no per-voyage licence, and no commercial weather-routing
+subscription. On the Cape Town to Bharati leg the modelled fuel difference alone is about
+₹5.8 lakh, but the material saving is charter time: **17 days**.
+
+### Risks, and what the build actually does about each
+
+| Risk | Mitigation, as implemented |
+| :--- | :--- |
+| Polar night and cloud make optical sensors useless for months | The design relies on C-band SAR and passive microwave, which are unaffected by darkness or cloud. No optical product is in the critical path. |
+| Satellite bandwidth below 60°S | Contours and deltas instead of rasters, **measured** at 23.4 KB/day against a 50 KB budget. |
+| A lead closes behind the ship | Drift-field divergence gives a compression index; convergent regimes are penalised in the route cost and raise a `COMPRESSION_BESETTING` alert under way. |
+| Growlers are invisible to satellites | A separate near-field radar layer that reports its own misses — 26 of 39 real targets undetected in a representative pack-ice sweep. |
+| The forecast is wrong on arrival | The voyage engine resamples conditions at the ship's actual arrival time and re-plans from the present position when a hard constraint is violated. |
+| Ice thickness cannot be measured tactically | Thermodynamic derivation from Freezing Degree Days plus dynamic ridging, which is what operational ice services do. |
+
+---
+
+## Impact and benefits
+
+**For NCPOR and the expedition.** Mission assurance for the annual Indian Antarctic Expedition.
+The measured result across three legs is **151 to 413 hours of transit time saved** and a better
+worst-case POLARIS index on every leg — 6→12, 5→10 and 9→12. Charter time is the dominant cost of
+a polar resupply, so days are worth more than tonnes.
+
+**For the ice navigator.** Replaces a 12-to-24-hour-old manual ice chart with a quantitative risk
+surface, a speed that is derived from hull physics rather than assumed, and alerting that names
+the hazard and the action.
+
+**Safety.** The optimiser refuses to route through ice where POLARIS prohibits operation, and it
+refuses cells where the ship cannot make way at all. In testing it lifted the closest approach to
+a 32 km tabular berg from 3.0 nm — inside the berg — to 160 nm.
+
+**Environmental.** CO₂ is reported per voyage at 3.206 kg per kg of MGO. Shorter transits mean
+less time operating in Antarctic Specially Protected Areas, and the Polar Code heavy-fuel-oil
+carriage ban is respected by construction, since the fuel model is MGO throughout.
+
+**Strategic.** An open, auditable, offline-capable stack with no foreign commercial dependency,
+supporting India's obligations under the Antarctic Act, 2022.
 
 ---
 

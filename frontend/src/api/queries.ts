@@ -14,6 +14,7 @@ import type {
   ForecastSkillResponse,
   HealthResponse,
   IceField,
+  IceState,
   IcebergForecast,
   IcebergsResponse,
   RadarSweep,
@@ -124,6 +125,23 @@ export function useIceField(p: IceFieldParams | null): UseQueryResult<IceField> 
     enabled: Boolean(p),
     staleTime: Infinity,
     placeholderData: (prev) => prev,
+  });
+}
+
+/**
+ * Point inspection: everything the ice model knows at one coordinate.
+ * Enabled only when the user has actually clicked somewhere.
+ */
+export function useIcePoint(
+  lat: number | null,
+  lon: number | null,
+  leadHours: number,
+): UseQueryResult<IceState> {
+  return useQuery({
+    queryKey: ['ice-point', lat?.toFixed(3), lon?.toFixed(3), leadHours],
+    queryFn: () => api.getIcePoint(lat as number, lon as number, leadHours),
+    enabled: lat !== null && lon !== null,
+    staleTime: Infinity,
   });
 }
 

@@ -119,7 +119,6 @@ export class MapEngine {
   private dpr = 1;
   private dirty = true;
   private rafId: number | null = null;
-  private lastFrameMs = 0;
   private frameMs = 0;
 
   attach(canvas: HTMLCanvasElement): void {
@@ -162,14 +161,13 @@ export class MapEngine {
 
   private start(): void {
     if (this.rafId !== null) return;
-    const loop = (t: number): void => {
+    const loop = (): void => {
       this.rafId = requestAnimationFrame(loop);
       if (!this.dirty) return;
       this.dirty = false;
       const started = performance.now();
       this.render();
       this.frameMs = performance.now() - started;
-      this.lastFrameMs = t;
     };
     this.rafId = requestAnimationFrame(loop);
   }
