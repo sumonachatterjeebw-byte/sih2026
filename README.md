@@ -55,6 +55,9 @@ cd frontend && npm install && npm run dev            # http://localhost:5173
 No API keys. No map tile provider. No network calls at runtime. It runs on a laptop in
 aeroplane mode, which is the point: the target user is on a ship below 60°S.
 
+Presenting this to someone? **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)** is a five-minute
+walkthrough with the numbers, the order to show them in, and the questions worth rehearsing.
+
 **Terminal-only demonstration** (no browser needed):
 
 ```bash
