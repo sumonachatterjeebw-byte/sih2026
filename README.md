@@ -11,7 +11,8 @@
 
 A working decision-support system for the ships that resupply India's Antarctic stations,
 **Maitri** and **Bharati**. It forecasts sea ice, predicts iceberg drift, and plans a route that
-is provably safe under the IMO Polar Code while burning less fuel and arriving sooner.
+satisfies the IMO Polar Code, arrives days sooner, and carries a materially better safety
+margin than the route a ship would otherwise sail.
 
 ---
 
@@ -82,21 +83,42 @@ through identical physics:
 
 ```
 Route                                       Distance    Time     Fuel   min RIO
-Ice-blind shortest navigable route             2853 nm    718 h    301 t       6
-POLARIS-constrained optimised route            3140 nm    302 h    299 t      12
+Ice-blind shortest navigable route             2853 nm    719 h    301 t       6
+POLARIS-constrained optimised route            3018 nm    306 h    292 t      12
 
-Time saved   416 h  (17.3 days)
-Fuel saved   0.36 %
-Distance     +287 nm — the safe route is longer, and still faster
+Time saved   413 h  (17.2 days)
+Fuel saved   2.84 %
+Distance     +165 nm — the safe route is longer, and still far faster
 ```
 
-That result is the whole argument. The optimised route sails **287 nautical miles further** and
+That result is the whole argument. The optimised route sails **165 nautical miles further** and
 arrives **17 days sooner**, because it goes around the thick ice instead of grinding through it,
 and its worst-case POLARIS risk index is 12 instead of 6.
 
-On a different leg the trade lands differently. Cape Town to Maitri saves almost no time but
-lifts the minimum RIO from 1 to 9. **The system reports whichever is true.** There is no fixed
-percentage anywhere in the codebase.
+### The result we did not expect, and did not hide
+
+Run the same comparison across three legs and the fuel story falls apart:
+
+| Leg | Fuel saved | Transit time saved | Minimum RIO |
+| :--- | ---: | ---: | :--- |
+| Cape Town → Bharati | **+2.8%** | 413 h (17.2 d) | 6 → **12** |
+| Cape Town → Maitri | **−8.0%** | 169 h (7.0 d) | 5 → **10** |
+| Hobart → Bharati | **−2.4%** | 151 h (6.3 d) | 9 → **12** |
+
+A negative number means the optimised route burns *more* fuel than the ice-blind one.
+
+On two of three legs the safe route **burns more fuel**, because going around the ice adds
+distance and the distance costs more than the ice avoided. What it buys instead is 6 to 17 days
+of transit time and a materially better risk margin on every single leg.
+
+We tried to make the fuel number look better by re-weighting the objective toward fuel. It
+barely moved: on the Maitri leg the fuel penalty stays near 8% whichever way the weights are
+set, because it is a property of the geography and the ice, not of the search.
+
+**So the honest headline for this system is time and safety, not fuel.** The planner emits an
+explicit warning whenever the optimised route costs more fuel than the ice-blind one, saying it
+is being recommended because it is safer, not cheaper. There is no fixed percentage anywhere in
+the codebase, which is exactly why the number is allowed to come out negative.
 
 ---
 
@@ -278,7 +300,9 @@ beset, and the planner routes around it.
 **2. The saving is measured, not multiplied.** The v0.1 prototype computed
 `baseline = optimised × 1.22` and reported "22% saved" — a constant dressed as a result. Now two
 routes are planned and both are sailed through identical physics. The difference is the saving,
-and it varies from 0.4% to 13% across legs, which is what an honest measurement looks like.
+and across three legs the fuel saving ranges from **+2.8% to −8.0%** while transit time saved
+ranges from 151 to 413 hours. A measurement that is allowed to come out negative is the
+difference between a result and a slogan.
 
 **3. The land mask is real.** 97 Natural Earth polygons answer 25,000 point-in-polygon queries
 per second. A waypoint cannot be placed on the continent. Because Maitri is 80 km inland, each
@@ -399,10 +423,11 @@ Backwards compatible: every v0.1 endpoint and request body still works.
 5. **The S-411 export is not certified.** It is a representative attribute subset.
 6. **Vessel hull angles, block coefficients and SFOC are engineering estimates**, marked as such
    in the source. Principal dimensions and installed power are published figures.
-7. **The measured fuel saving (0.4% to 13%) is below the 15–22% figure** in the original
-   blueprint. That figure came from the literature, not from this system. Ours is what our models
-   measure, and on several legs the real benefit is transit time and safety margin rather than
-   fuel.
+7. **We do not reproduce the 15–22% fuel reduction** claimed in the original blueprint. That
+   figure came from the literature, not from this system. What our models measure is a fuel
+   saving between +2.8% and −8.0%, alongside 151 to 413 hours of transit time saved and a better
+   minimum RIO on every leg. On two of three legs the safe route costs more fuel, and the system
+   says so rather than burying it.
 
 ---
 

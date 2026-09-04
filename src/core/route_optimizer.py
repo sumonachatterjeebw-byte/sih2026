@@ -44,7 +44,7 @@ from __future__ import annotations
 import heapq
 import math
 import time
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -293,6 +293,9 @@ class VesselPerformance:
 
 _PERF_CACHE: Dict[str, VesselPerformance] = {}
 
+#: Cached iceberg drift tracks, keyed by (berg id, departure time, horizon).
+_BERG_TRACK_CACHE: Dict[Tuple[str, float, int], Tuple[Tuple[float, ...], Tuple[float, ...], Tuple[float, ...]]] = {}
+
 
 def get_performance(vessel: VesselParameters, installed_power_kw: float) -> VesselPerformance:
     key = f"{vessel.model_dump_json()}|{installed_power_kw}"
@@ -469,6 +472,42 @@ def _vectorised_speed_cap(ice_class: IceClass, rio: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------------------------------
 # The optimiser
 # --------------------------------------------------------------------------------------
+class DriftingExclusion(NamedTuple):
+    """
+    A tracked berg as a keep-out circle that moves along its forecast track.
+
+    Testing against the berg's departure position is wrong for a passage lasting days. A first
+    attempt extrapolated a constant drift velocity, which was cheap but diverged badly from the
+    real track over 200-plus hours and still let a route pass 3 nm from the centre of a 32 km
+    berg. The exclusion now follows the actual RK4 forecast, sampled at coarse steps and
+    interpolated, and the radius grows with lead time to reflect forecast uncertainty.
+    """
+
+    berg_id: str
+    hours: Tuple[float, ...]
+    lats: Tuple[float, ...]
+    lons: Tuple[float, ...]
+    base_radius_nm: float
+    uncertainty_growth_nm_per_day: float
+
+    def position_at(self, hours: float) -> Tuple[float, float]:
+        clamped = min(max(hours, self.hours[0]), self.hours[-1])
+        lat = float(np.interp(clamped, self.hours, self.lats))
+        lon = float(np.interp(clamped, self.hours, self.lons))
+        return lat, lon
+
+    def radius_at(self, hours: float) -> float:
+        return self.base_radius_nm + self.uncertainty_growth_nm_per_day * (max(0.0, hours) / 24.0)
+
+
+def _intersects_iceberg(exclusions: Sequence[DriftingExclusion], lat: float, lon: float, hours: float) -> bool:
+    for berg in exclusions:
+        blat, blon = berg.position_at(hours)
+        if haversine_nm(lat, lon, blat, blon) < berg.radius_at(hours):
+            return True
+    return False
+
+
 _NEIGHBOURS: List[Tuple[int, int]] = [
     (1, 0), (-1, 0), (0, 1), (0, -1),
     (1, 1), (1, -1), (-1, 1), (-1, -1),
@@ -543,7 +582,7 @@ class PolarRouteOptimizer:
         goal_node: Tuple[int, int],
         goal_pos: Tuple[float, float],
         ice_aware: bool,
-        exclusions: Sequence[Tuple[float, float, float]],
+        exclusions: Sequence["DriftingExclusion"],
         t0_hours: float,
     ) -> Tuple[List[Tuple[int, int]], SearchDiagnostics]:
         """
@@ -628,10 +667,14 @@ class PolarRouteOptimizer:
                     if state["rio"] < RIO_PROHIBITED_THRESHOLD:
                         rejected["rio"] += 1
                         continue
-                    if any(
-                        haversine_nm(nlat, nlon, blat, blon) < radius
-                        for blat, blon, radius in exclusions
-                    ):
+                    # Iceberg exclusion, evaluated at the time the ship would arrive.
+                    #
+                    # Testing against the berg's departure position is wrong for a passage that
+                    # takes days: a tabular berg drifts tens of kilometres a day, so a route
+                    # planned clear of it at t=0 can pass within a few miles of it on arrival.
+                    # Each berg therefore carries a drift velocity and the test is made against
+                    # its extrapolated position.
+                    if _intersects_iceberg(exclusions, nlat, nlon, t_here):
                         rejected["iceberg"] += 1
                         continue
 
@@ -776,6 +819,79 @@ class PolarRouteOptimizer:
             prohibited_waypoints=prohibited,
         )
 
+    def _build_exclusions(
+        self,
+        start: Tuple[float, float],
+        dest: Tuple[float, float],
+        cache: FieldCache,
+        t0_hours: float,
+    ) -> List[DriftingExclusion]:
+        """
+        Build moving keep-out zones from the tracked iceberg catalogue.
+
+        Only bergs whose start position lies near the corridor are integrated, because running
+        the drift model over the whole catalogue would add more time to a plan than the search
+        itself takes, and a berg a thousand miles away cannot reach the track.
+        """
+        try:
+            from src.core.iceberg_tracker import predict_iceberg_drift
+            from src.data.icebergs import get_iceberg_profiles
+        except Exception:  # pragma: no cover - the catalogue is an optional layer
+            return []
+
+        corridor = great_circle_path(start[0], start[1], dest[0], dest[1], 24)
+        horizon = float(np.clip(cache.slice_hours[-1], 24.0, MAX_FORECAST_LEAD_HOURS))
+        exclusions: List[DriftingExclusion] = []
+
+        for berg in get_iceberg_profiles():
+            # A berg can only matter if it starts within reach of the corridor. The screening
+            # distance allows for several hundred miles of drift over a long passage.
+            if min(haversine_nm(berg.latitude, berg.longitude, lat, lon) for lat, lon in corridor) > 500.0:
+                continue
+
+            # Berg tracks depend only on the berg and the departure time, not on the route, so
+            # they are cached across plans. Without this, integrating the catalogue doubled the
+            # time to produce a plan every single time.
+            key = (berg.berg_id, round(t0_hours, 1), int(horizon))
+            track = _BERG_TRACK_CACHE.get(key)
+            if track is None:
+                forecast = predict_iceberg_drift(
+                    berg,
+                    forecast_hours=int(horizon),
+                    time_step_hours=24,
+                    t0_hours=t0_hours,
+                    ensemble_members=1,
+                    environment=self.env,
+                )
+                track = (
+                    tuple(float(p.hour) for p in forecast.trajectory),
+                    tuple(p.latitude for p in forecast.trajectory),
+                    tuple(p.longitude for p in forecast.trajectory),
+                )
+                if len(_BERG_TRACK_CACHE) > 256:
+                    _BERG_TRACK_CACHE.clear()
+                _BERG_TRACK_CACHE[key] = track
+            hours, lats, lons = track
+            if len(hours) < 2:
+                continue
+
+            # The berg's own half-length, plus the standing clearance. A 32 km berg is 8.6 nm
+            # across, so a flat 12 nm keep-out would put a ship inside it.
+            half_length_nm = (berg.length_m / 1852.0) * 0.5
+            exclusions.append(
+                DriftingExclusion(
+                    berg_id=berg.berg_id,
+                    hours=hours,
+                    lats=lats,
+                    lons=lons,
+                    base_radius_nm=ICEBERG_EXCLUSION_RADIUS_NM + half_length_nm,
+                    # Positional uncertainty grows with lead time; the ensemble spread for a
+                    # tabular berg is a few kilometres a day.
+                    uncertainty_growth_nm_per_day=1.5,
+                )
+            )
+        return exclusions
+
     @staticmethod
     def _nearest_cell(cache: FieldCache, lat: float, lon: float) -> Tuple[int, int]:
         i = int(round((lat - cache.lat_min) / cache.lat_step))
@@ -806,16 +922,9 @@ class PolarRouteOptimizer:
         start_node = self._node_of(cache, start_lat, cache.lon_min + lon_delta(normalize_lon(cache.lon_min), start_lon))
         goal_node = self._node_of(cache, dest_lat, dest_lon_unwrapped)
 
-        exclusions: List[Tuple[float, float, float]] = []
+        exclusions: List[DriftingExclusion] = []
         if avoid_icebergs:
-            try:
-                from src.data.icebergs import get_iceberg_profiles
-
-                for berg in get_iceberg_profiles():
-                    radius = ICEBERG_EXCLUSION_RADIUS_NM + (berg.length_m / 1852.0) * 0.5
-                    exclusions.append((berg.latitude, berg.longitude, radius))
-            except Exception:  # pragma: no cover - catalogue is optional
-                pass
+            exclusions = self._build_exclusions(start, dest, cache, departure_time_hours)
 
         # 1. The ice-blind baseline: shortest navigable track, land and clearance only.
         base_path, base_diag = self._search(

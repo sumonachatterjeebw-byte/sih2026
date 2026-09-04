@@ -3,6 +3,32 @@
 
 ---
 
+> ## ADDENDUM: measured results supersede the projected figures below
+>
+> This blueprint was written before the system was built. The prototype now exists, it runs, and
+> it measures its own performance. **Where a number below disagrees with a number the code
+> produces, the code is right and this document is out of date.** Present the measured figures.
+>
+> | Claim in this blueprint | What the built system actually measures |
+> | :--- | :--- |
+> | 15–22% bunker fuel reduction | **Not reproduced. Measured fuel saving is +2.8% to −8.0% depending on the leg, and on two of three legs the safe route burns MORE fuel than the ice-blind one.** The figure is now derived by planning two routes and sailing both through identical physics, then differencing, so it is allowed to come out negative. The real, consistent benefit is **151 to 413 hours of transit time saved** and a better minimum RIO on every leg. Present time and safety, not fuel. |
+> | 2–4 days saved per leg | **Understated, and this is the strongest measured result.** Cape Town to Bharati saves 413 hours (17.2 days), Cape Town to Maitri 169 hours (7.0 days), Hobart to Bharati 151 hours (6.3 days). Minimum RIO improves on every leg: 6→12, 5→10, 9→12. |
+> | Zero besetting events | The planner enforces `RIO >= -10` and rejects any cell where the ship cannot make way. It cannot promise zero besetting in the real world, and it should not be presented as doing so. |
+> | Physics-Informed Neural Network for iceberg drift | **Implemented as a residual corrector on an RK4 physics core, not a PINN** — the governing equation is not part of the loss function. It is also currently a *negative result*: it does not reliably improve on pure physics. See `docs/ML_MODELS.md`. |
+> | Conv-U-Net / IceNet-architecture SIC forecaster | **Not built.** The shipped forecaster is a semi-Lagrangian physics scheme that beats persistence by +0.08 to +0.17 across 24–168 h. A gradient-boosted learned model was trained and *does not beat it*, and is not used. A U-Net becomes the right tool when real satellite rasters replace the synthetic fields. |
+> | Edge YOLO growler detection | **Implemented as a trained tabular classifier on radar-return features** (F1 0.989 against 0.701 for an SNR threshold), not a YOLO detector on imagery. The distinction is stated rather than blurred. |
+> | `<50 KB/day` over Iridium Certus | **Confirmed by measurement: 23.4 KB/day.** Both payloads are serialised and gzipped, and the byte counts are real. |
+>
+> **What is real, and what is simulated.** The ship physics, the IMO POLARIS risk tables, the
+> Antarctic coastline, the station coordinates and the geodesy are real. The sea-ice, wind,
+> current and wave fields are physically-shaped *simulations* standing in for OSI-SAF, AMSR2,
+> Sentinel-1, ERA5 and CMEMS. Every API response carrying a simulated field says so. All
+> reported skill is therefore simulated-environment skill, and must be described that way.
+>
+> See `README.md` for the full picture and `docs/ML_MODELS.md` for the training detail.
+
+---
+
 ## 1. Problem Statement & Operational Context
 
 | Parameter | Details |
