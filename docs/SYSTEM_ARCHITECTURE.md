@@ -102,10 +102,11 @@ A naive implementation of this system is unusably slow. The measured costs and t
 | :--- | ---: | :--- | ---: |
 | Land test in the A* inner loop | — | Bounding-box reject plus a memo cache on the quantised lattice | 25,000 queries/s |
 | Coast distance on gridded fields | one KD-tree query per point | One batched query into a bilinear lookup grid | 200k samples in 67 ms |
-| Ice model re-requesting coast geometry | dozens of times per field | Cache keyed on grid content | route planning 24 s → 6 s |
+| Ice model re-requesting coast geometry | dozens of times per field | Cache keyed on grid content, plus 48-hour forecast slices | route planning 24 s → 15 s |
 | Attainable speed per A* edge | a bisection each time | Tabulate over (thickness, concentration) and interpolate | ~1000x |
 | Iceberg ensemble integration | member-at-a-time, sampling per RK4 stage | Vectorise the ensemble; refresh forcing every 30 simulated minutes | 109 s → 4 s |
-| Voyage tick | re-sampling ice and environment inside the radar sweep | Pass the already-sampled state through | 2340 ms → 169 ms |
+| Voyage tick | re-sampling ice and environment inside the radar sweep, and re-running the berg closest-approach check every tick | Pass the already-sampled state through; refresh the berg check on a fixed simulated-time interval | 2340 ms → 169 ms |
+| Iceberg keep-out zones in the planner | a drift forecast per berg, per plan | Screen to bergs within 500 nm of the corridor, then cache tracks across plans | first plan 32 s, repeats 12 s |
 
 Two of these were correctness fixes as much as performance ones. The iceberg integrator used a
 fixed timestep, which is stable for a giant tabular berg but **diverges to NaN within a day for a

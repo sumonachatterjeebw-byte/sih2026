@@ -131,7 +131,7 @@ the codebase, which is exactly why the number is allowed to come out negative.
 | **Python 3.11** | The polar science ecosystem (xarray, NetCDF4, GDAL, Copernicus toolboxes) is Python. Ingesting real ERA5 and OSI-SAF products later means staying where those libraries live. |
 | **FastAPI** | Pydantic v2 models give a typed schema and an OpenAPI document for free, so the frontend generates its types from the running server instead of guessing. WebSocket support is native, which the live voyage stream needs. |
 | **Pydantic v2** | Validation at the boundary, and the same models serialise to the wire. An ice concentration above 1.0 or a negative thickness is rejected at the edge rather than corrupting a route. |
-| **NumPy** | Every field is evaluated on grids of thousands of points. Vectorising the ice model took route planning from 24 seconds to 6. |
+| **NumPy** | Every field is evaluated on grids of thousands of points. Vectorising the ice model and caching the static coast geometry took route planning from 24 seconds to 15, and the iceberg drift ensemble from 109 seconds to 4. |
 | **SciPy** | `cKDTree` for distance-to-coast over 1698 coastline vertices. |
 | **scikit-learn** | Trains in seconds on a CPU. A laptop demo cannot depend on a GPU, and a bridge PC does not have one. See the training section for why this was the right size of tool. |
 | **SQLite** | The shipboard console is one rugged PC on a bridge with no infrastructure behind it. A file-backed database with WAL works there unchanged and works at NCPOR headquarters too. |
