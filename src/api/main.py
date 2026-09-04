@@ -1,35 +1,56 @@
 """
-POLAR-NAV AI: FastAPI REST Service.
-Provides navigation decision support, POLARIS risk indexing, Lindqvist resistance,
-and iceberg drift predictions for shipboard consoles and NCPOR HQ dashboards.
-"""
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
+POLAR-NAV AI REST and WebSocket service.
 
-from src.core.polaris_risk import (
-    IceClass, IceType, IceRegimeComponent, calculate_rio, POLARISAssessmentResult
+Serves the Antarctic navigation decision-support models to the bridge console and to any client
+that speaks HTTP. Everything is computed on request from the physics core; there are no canned
+responses anywhere in this service.
+
+Run it with:
+
+    uvicorn src.api.main:app --reload --port 8000
+
+and open http://localhost:8000/docs for the interactive schema.
+"""
+from __future__ import annotations
+
+import time
+from typing import Any, Dict
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from src.core.constants import (
+    DATA_PROVENANCE,
+    DEPARTMENT,
+    MODEL_VERSIONS,
+    ORGANIZATION,
+    PROBLEM_STATEMENT_ID,
+    SYSTEM_NAME,
+    SYSTEM_VERSION,
 )
-from src.core.lindqvist_model import (
-    VesselParameters, calculate_ice_resistance, ResistanceResult
-)
-from src.core.iceberg_tracker import (
-    IcebergProfile, predict_iceberg_drift, IcebergForecastResult
-)
-from src.core.route_optimizer import (
-    PolarRouteOptimizer, OptimizationSummary
-)
-from src.data.mock_polar_data import (
-    get_antarctic_stations, get_known_active_icebergs, generate_polar_grid_geojson
-)
+from src.api.routers import environment as environment_router
+from src.api.routers import geo as geo_router
+from src.api.routers import navigation as navigation_router
+from src.api.routers import physics as physics_router
+from src.api.routers import voyages as voyages_router
+
+_STARTED_AT = time.time()
 
 app = FastAPI(
-    title="POLAR-NAV AI: Antarctic Decision Support System",
-    description="MoES / NCPOR SIH 2026 Problem Statement 26059 Navigation Decision Engine.",
-    version="0.1.0"
+    title=f"{SYSTEM_NAME}: Antarctic Navigation Decision Support",
+    description=(
+        "Sea-ice forecasting, iceberg drift, IMO POLARIS risk indexing, Lindqvist ice resistance "
+        "and risk-constrained route optimisation for Indian Antarctic Expedition vessels. "
+        "Smart India Hackathon 2026, problem statement 26059, for MoES / NCPOR.\n\n"
+        "**Honesty note.** The physics, the POLARIS tables and the coastline are real. The "
+        "atmospheric, oceanographic and sea-ice fields are synthetic stand-ins for ERA5, CMEMS "
+        "and OSI-SAF products; every response carrying them says so in an `is_synthetic` field."
+    ),
+    version=SYSTEM_VERSION,
 )
 
+# The bridge console is served from a separate origin during development, and on a ship it is a
+# local device on the same LAN. Neither case benefits from origin restrictions here.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,80 +59,98 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def read_root():
+app.include_router(geo_router.router)
+app.include_router(environment_router.router)
+app.include_router(physics_router.router)
+app.include_router(navigation_router.router)
+app.include_router(voyages_router.router)
+
+
+@app.get("/", tags=["meta"])
+def read_root() -> Dict[str, Any]:
+    """Service identity. The v0.1 response shape is preserved."""
     return {
-        "system": "POLAR-NAV AI Decision Support System",
-        "problem_statement_id": "26059",
-        "organization": "Ministry of Earth Sciences (MoES) / NCPOR",
+        "system": f"{SYSTEM_NAME} Decision Support System",
+        "problem_statement_id": PROBLEM_STATEMENT_ID,
+        "organization": f"{ORGANIZATION} / NCPOR",
         "status": "OPERATIONAL",
-        "version": "0.1.0",
-        "docs_url": "/docs"
+        "version": SYSTEM_VERSION,
+        "docs_url": "/docs",
+        "health_url": "/api/v1/health",
     }
 
-class POLARISRequest(BaseModel):
-    ice_class: IceClass = IceClass.PC5
-    components: List[IceRegimeComponent]
 
-@app.post("/api/v1/risk/polaris", response_model=POLARISAssessmentResult)
-def assess_polaris_risk(req: POLARISRequest):
+@app.get("/api/v1/health", tags=["meta"])
+def health() -> Dict[str, Any]:
+    """
+    Liveness, model versions and data provenance.
+
+    The provenance block is the important part: it states, per data layer, whether it is real or
+    simulated and what it stands in for. A reviewer should be able to answer "which of these
+    numbers came from the world?" without reading any code.
+    """
+    ml_status: Dict[str, Any]
     try:
-        return calculate_rio(req.ice_class, req.components)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        from src.ml.registry import ml_status as _ml_status
 
-class ResistanceRequest(BaseModel):
-    vessel: Optional[VesselParameters] = None
-    velocity_knots: float = 10.0
-    ice_thickness_m: float = 0.8
-    ice_concentration: float = 0.7
+        ml_status = _ml_status()
+    except Exception:
+        # The machine-learning layer is optional. The physics path never depends on it.
+        ml_status = {"available": False, "reason": "ML package not installed or no trained models found"}
 
-@app.post("/api/v1/resistance/calculate", response_model=ResistanceResult)
-def calculate_resistance(req: ResistanceRequest):
-    vessel = req.vessel or VesselParameters()
-    return calculate_ice_resistance(
-        vessel=vessel,
-        velocity_knots=req.velocity_knots,
-        ice_thickness_m=req.ice_thickness_m,
-        ice_concentration=req.ice_concentration
-    )
+    return {
+        "status": "ok",
+        "system": SYSTEM_NAME,
+        "version": SYSTEM_VERSION,
+        "problem_statement_id": PROBLEM_STATEMENT_ID,
+        "organization": ORGANIZATION,
+        "department": DEPARTMENT,
+        "uptime_seconds": round(time.time() - _STARTED_AT, 1),
+        "model_versions": MODEL_VERSIONS,
+        "data_provenance": DATA_PROVENANCE,
+        "machine_learning": ml_status,
+        "external_network_calls": False,
+        "api_keys_required": False,
+    }
 
-class IcebergDriftRequest(BaseModel):
-    iceberg: IcebergProfile
-    wind_speed_ms: float = 15.0
-    wind_direction_from_deg: float = 90.0
-    current_speed_ms: float = 0.4
-    current_direction_to_deg: float = 270.0
-    forecast_hours: int = 72
 
-@app.post("/api/v1/icebergs/predict-drift", response_model=IcebergForecastResult)
-def predict_iceberg(req: IcebergDriftRequest):
-    return predict_iceberg_drift(
-        berg=req.iceberg,
-        wind_speed_ms=req.wind_speed_ms,
-        wind_direction_from_deg=req.wind_direction_from_deg,
-        current_speed_ms=req.current_speed_ms,
-        current_direction_to_deg=req.current_direction_to_deg,
-        forecast_hours=req.forecast_hours
-    )
+@app.get("/api/v1/visualize/antarctica-grid", tags=["meta"])
+def antarctica_grid() -> Dict[str, Any]:
+    """
+    Stations and tracked icebergs as a GeoJSON FeatureCollection.
 
-class RouteRequest(BaseModel):
-    start_lat: float = -55.0
-    start_lon: float = 20.0
-    dest_lat: float = -69.41
-    dest_lon: float = 76.19
-    ice_class: IceClass = IceClass.PC5
+    Retained from v0.1 so existing clients keep working. New clients should prefer
+    `/api/v1/geo/stations`, `/api/v1/geo/coastline` and `/api/v1/icebergs`, which carry far more.
+    """
+    from src.data.icebergs import get_iceberg_catalogue
+    from src.data.stations import get_stations
 
-@app.post("/api/v1/route/optimize", response_model=OptimizationSummary)
-def optimize_route(req: RouteRequest):
-    optimizer = PolarRouteOptimizer(ice_class=req.ice_class)
-    return optimizer.optimize_route(
-        start_lat=req.start_lat,
-        start_lon=req.start_lon,
-        dest_lat=req.dest_lat,
-        dest_lon=req.dest_lon
-    )
-
-@app.get("/api/v1/visualize/antarctica-grid")
-def get_polar_grid():
-    return generate_polar_grid_geojson()
+    features = []
+    for station in get_stations():
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [station["longitude"], station["latitude"]]},
+                "properties": {
+                    "type": "Research_Station",
+                    "name": station["name"],
+                    "region": station["region"],
+                    "country": station["country"],
+                    "anchorage": [station["anchorage_lat"], station["anchorage_lon"]],
+                },
+            }
+        )
+    for berg in get_iceberg_catalogue():
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [berg["longitude"], berg["latitude"]]},
+                "properties": {
+                    "type": "Tracked_Iceberg",
+                    "berg_id": berg["berg_id"],
+                    "length_m": berg["length_m"],
+                    "origin": berg["origin"],
+                },
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}

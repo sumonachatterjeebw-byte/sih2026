@@ -53,3 +53,19 @@ data/processed/*
 # Temporary / Lock files
 ~$*.pptx
 *.tmp
+
+# POLAR-NAV runtime artefacts
+data/polarnav.db
+data/polarnav.db-wal
+data/polarnav.db-shm
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+
+# Trained model binaries are regenerable with `python -m scripts.train` and total ~13 MB, so
+# they are not committed. models/metrics.json IS committed: it is the machine-readable record
+# of every metric the README cites, and the ML layer degrades gracefully when the binaries
+# are absent (the physics path never depends on them).
+models/*.joblib

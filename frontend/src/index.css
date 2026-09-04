@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-ground text-ink font-sans antialiased;
+    margin: 0;
+    overscroll-behavior: none;
+    font-size: 13px;
+  }
+  /* Numerals are always monospace: a bridge instrument never reflows its digits. */
+  .num,
+  .tabular {
+    font-family: theme('fontFamily.mono');
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #070b12;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e2e44;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a3e5c;
+  }
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: #1e2e44;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #22d3ee;
+    border: 2px solid #04121a;
+    cursor: pointer;
+  }
+  input[type='range']::-moz-range-thumb {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #22d3ee;
+    border: 2px solid #04121a;
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-panel/90 border border-hair rounded-md shadow-glass backdrop-blur-[2px];
+  }
+  .panel-head {
+    @apply flex items-center justify-between gap-2 px-3 py-2 border-b border-hair text-2xs uppercase tracking-[0.14em] text-ink-2;
+  }
+  .hairline {
+    @apply border-hair;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded border border-hair-2 bg-panel-2 px-2.5 py-1.5 text-xs text-ink-2
+      transition-colors hover:border-accent/60 hover:text-ink disabled:opacity-40 disabled:pointer-events-none;
+  }
+  .btn-accent {
+    @apply border-accent/50 bg-accent/10 text-accent hover:bg-accent/20 hover:text-accent;
+  }
+  .btn-danger {
+    @apply border-danger/50 bg-danger/10 text-danger hover:bg-danger/20;
+  }
+  .field {
+    @apply w-full rounded border border-hair bg-panel-2 px-2 py-1.5 text-xs text-ink outline-none
+      focus:border-accent/70;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs uppercase tracking-wider;
+  }
+  .grid-lines {
+    background-image: linear-gradient(rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+}
