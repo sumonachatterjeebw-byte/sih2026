@@ -107,49 +107,125 @@ data-loader change, not a model change — the interfaces already match the real
 
 ## Quickstart
 
-**One command:**
+### Prerequisites
+
+| | Version | Check with |
+| :--- | :--- | :--- |
+| Python | 3.11 or newer | `python --version` |
+| Node.js | 18 or newer | `node --version` |
+
+Nothing else. **No API keys, no accounts, no map tile provider, no cloud services.** It runs on a
+laptop in aeroplane mode, which is the point: the target user is on a ship below 60°S where there
+is no connectivity to depend on.
+
+### Option A — one command
 
 ```powershell
-.\start.ps1          # Windows
-./start.sh           # macOS, Linux, Git Bash
+# Windows (PowerShell)
+.\start.ps1
+
+# macOS, Linux, or Git Bash on Windows
+./start.sh
 ```
 
-It installs what is missing, starts the API, waits for it to warm its caches, then starts the
-bridge console. Open **http://localhost:5173**. `.\start.ps1 -Check` runs the verification suite
-instead of serving.
+It installs anything missing, starts the API, waits for it to warm its caches, then starts the
+bridge console and tells you when to open the browser.
 
-**Or by hand, two terminals:**
+> **If PowerShell blocks the script** with an execution-policy error, either run
+> `powershell -ExecutionPolicy Bypass -File .\start.ps1` once, or use Option B.
+
+Useful flags: `.\start.ps1 -Check` runs the verification suite instead of serving, and
+`-SkipInstall` skips dependency installation on later runs.
+
+### Option B — two terminals, by hand
 
 ```bash
-# 1. Backend
+# Terminal 1 — backend.  Run from the repository root, not from inside src/.
 pip install -r requirements.txt
-uvicorn src.api.main:app --port 8000                 # http://localhost:8000/docs
+uvicorn src.api.main:app --port 8000
+#   API docs:  http://localhost:8000/docs
 
-# 2. Frontend
-cd frontend && npm install && npm run dev            # http://localhost:5173
+# Terminal 2 — bridge console
+cd frontend
+npm install          # first run only, takes a minute
+npm run dev
+#   Console:   http://localhost:5173
 ```
 
-No API keys. No map tile provider. No network calls at runtime. It runs on a laptop in
-aeroplane mode, which is the point: the target user is on a ship below 60°S.
+Then open **http://localhost:5173**.
+
+> Add `--reload` to the uvicorn command while developing. Without it the server keeps running the
+> code it started with, and edits to Python files will not take effect until you restart it.
+
+### What to expect on first run
+
+| | |
+| :--- | :--- |
+| Backend answers requests | immediately |
+| Cache warm-up finishes in the background | about 35 s |
+| First route plan | about 12 s once warm, up to 30 s if you plan before warm-up completes |
+| Voyage: press Start, first tick appears | about 12 s |
+
+The waits are real computation, not loading spinners: planning runs two independent A\* searches
+and integrates iceberg drift tracks. The interface names the stage it is working on while you
+wait.
+
+### Using it — three steps
+
+The console opens on **How it works**, which explains the system before you press anything.
+
+1. **1. Plan a route** — pick an origin and an Indian Antarctic station, pick a ship, press
+   **Plan voyage**. Cape Town → Bharati is the default and the one worth seeing first.
+2. **2. Sail it** — press **Start voyage**. The ship sails the plan hour by hour: watch it slow
+   as it meets the ice, and watch the alerts arrive.
+3. **Simple view** (top right) toggles on the Ice Forecast, Iceberg Tracker and Analytics screens.
+
+Every piece of jargon on screen — RIO, besetting, compression, CPA — carries its own plain-English
+definition behind the **?** next to it.
+
+### Terminal-only demonstration
+
+No browser needed, and it exercises the same models:
+
+```bash
+python -m src.cli                 # POLARIS, Lindqvist, ice, icebergs, route, and a voyage
+python -m src.cli --quick         # skip the voyage simulation
+python -m src.cli --list          # available legs, vessels and stations
+python -m src.cli --leg capetown_maitri
+```
+
+### Optional: the trained models
+
+The machine-learning artefacts are **not committed** — they total about 13 MB and regenerate in
+roughly four minutes:
+
+```bash
+python -m scripts.train           # trains all three, rewrites models/metrics.json
+python -m scripts.train --quick   # faster, smaller datasets
+```
+
+**This is genuinely optional.** The physics path never depends on a trained model, and the system
+runs identically without them. `/api/v1/health` reports which are present, and
+`models/metrics.json` — which *is* committed — carries every measured metric so the results can be
+checked without retraining.
+
+### Regenerating the documentation
+
+```bash
+python -m scripts.make_report     # rebuilds the 20-page PDF from live model runs
+```
+
+Every figure in the report is computed when it is generated, so it cannot drift out of step with
+the code.
 
 **Want the whole thing in one document?**
 **[docs/report/POLAR-NAV-AI-Prototype-Report.pdf](docs/report/POLAR-NAV-AI-Prototype-Report.pdf)**
-is a 12-page report covering the architecture, the technology choices and why each was made, the
-constraints the system is built around, every measured result, the machine learning including the
-two models that failed, and the honest limitations. Regenerate it with
-`python -m scripts.make_report` — every figure in it is computed at generation time, so it cannot
-drift out of step with the code.
+covers the problem statement, what was built, how it helps, how it was built, the architecture,
+the technology choices and the reasoning behind each, every measured result, the machine learning
+including the two models that failed, and the honest limitations.
 
 Presenting this to someone? **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)** is a five-minute
 walkthrough with the numbers, the order to show them in, and the questions worth rehearsing.
-
-**Terminal-only demonstration** (no browser needed):
-
-```bash
-python -m src.cli                 # full run: POLARIS, Lindqvist, ice, icebergs, route, voyage
-python -m src.cli --quick         # skip the voyage simulation
-python -m src.cli --list          # available legs, vessels and stations
-```
 
 ---
 
@@ -233,12 +309,16 @@ alerts.
 
 ### Troubleshooting
 
-| Symptom | Cause |
+| Symptom | Cause and fix |
 | :--- | :--- |
-| Frontend loads but every panel is empty | Backend is not running on port 8000. The header shows "Backend offline". |
-| Planning seems to hang | First plan builds lookup tables and integrates iceberg tracks: 30 s cold, about 12 s after. |
-| `ModuleNotFoundError: src` | Run from the repository root, not from inside `src/`. |
-| ML section of `/health` says "not trained" | Expected on a fresh clone. Run `python -m scripts.train`; the physics path does not depend on it. |
+| Frontend loads but every panel is empty | The backend is not running. The header will say **Backend offline**. Start it on port 8000. |
+| `[Errno 10048] only one usage of each socket address` | Port 8000 is already taken, usually by a backend you started earlier. Reuse it, or stop it first. |
+| Planning seems to hang | It is not hanging. The first plan is about 30 s while caches warm, roughly 12 s afterwards. The overlay names the stage being computed. |
+| Python edits have no effect | `uvicorn` was started without `--reload`, so it is still running the code it loaded at start-up. Restart it. |
+| `ModuleNotFoundError: src` | Run from the repository **root**, not from inside `src/`. |
+| PowerShell refuses to run `start.ps1` | Execution policy. Use `powershell -ExecutionPolicy Bypass -File .\start.ps1`, or start the two servers by hand. |
+| `/health` says the ML models are not trained | Expected on a fresh clone; the binaries are not committed. Run `python -m scripts.train`, or ignore it — the physics path does not use them. |
+| The map area is blank | Should not happen; it was a real bug and is fixed. If it recurs, check the browser console and confirm the canvas has a non-zero height. |
 
 ---
 
