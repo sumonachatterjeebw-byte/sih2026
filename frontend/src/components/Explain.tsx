@@ -9,7 +9,8 @@
  * The rule for writing these: say what it means and why it matters, in one or two sentences,
  * without using another piece of jargon to do it.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HelpCircle } from 'lucide-react';
 
 export interface Definition {
@@ -151,12 +152,44 @@ export function Explain({
   className?: string;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
+  const anchorRef = useRef<HTMLSpanElement>(null);
   const def = GLOSSARY[term];
+
+  // The popup renders through a portal onto document.body rather than inline.
+  //
+  // These labels sit inside scrolling instrument rails with `overflow-y-auto`, and an absolutely
+  // positioned child of a scrolling box is clipped by it: the tooltip would be sliced in half or
+  // hidden entirely depending on where the panel happened to be scrolled. A portal escapes the
+  // clip, and the position is measured from the trigger each time it opens.
+  useEffect(() => {
+    if (!open || !anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const WIDTH = 260;
+    const MARGIN = 8;
+    const left = Math.min(Math.max(MARGIN, rect.left), window.innerWidth - WIDTH - MARGIN);
+    // Prefer above the label; drop below when there is not enough room up there.
+    const above = rect.top > 190;
+    setPos({ left, top: above ? rect.top - MARGIN : rect.bottom + MARGIN, above });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (): void => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+
   if (!def) return <>{children}</>;
 
   return (
     <span
-      className={`relative inline-flex items-center gap-1 ${className ?? ''}`}
+      ref={anchorRef}
+      className={`inline-flex items-center gap-1 ${className ?? ''}`}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -172,17 +205,27 @@ export function Explain({
       >
         <HelpCircle size={11} />
       </button>
-      {open && (
-        <span className="absolute bottom-full left-0 z-50 mb-1 block w-64 rounded border border-hair-2 bg-panel-3 p-2 text-left shadow-lg">
-          <span className="block text-2xs font-semibold uppercase tracking-[0.1em] text-accent">
-            {def.title}
-          </span>
-          <span className="mt-1 block text-2xs leading-relaxed text-ink">{def.short}</span>
-          {def.detail && (
-            <span className="mt-1 block text-2xs leading-relaxed text-ink-3">{def.detail}</span>
-          )}
-        </span>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[100] w-[260px] rounded border border-hair-2 bg-panel-3 p-2 text-left shadow-2xl"
+            style={{
+              left: pos.left,
+              top: pos.top,
+              transform: pos.above ? 'translateY(-100%)' : undefined,
+            }}
+          >
+            <div className="text-2xs font-semibold uppercase tracking-[0.1em] text-accent">
+              {def.title}
+            </div>
+            <div className="mt-1 text-2xs leading-relaxed text-ink">{def.short}</div>
+            {def.detail && (
+              <div className="mt-1 text-2xs leading-relaxed text-ink-3">{def.detail}</div>
+            )}
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }
