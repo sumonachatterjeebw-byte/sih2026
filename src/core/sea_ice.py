@@ -171,7 +171,16 @@ class SeaIceModel:
         floes = 0.20 * self._n_floe.fbm(lon_adv / 2.4, lat / 1.35, t_hours / 420.0, octaves=5)
         leads = self._n_lead.ridged(lon_adv / 5.5, lat / 2.2, t_hours / 520.0, octaves=3)
         lead_mask = smoothstep(0.86, 1.0, leads)  # narrow, linear features
-        conc = base + floes - 0.42 * lead_mask
+
+        # The perturbation only applies where there is ice to perturb.
+        #
+        # Applied unconditionally, the positive lobes of the floe noise created ice out of nothing
+        # far north of the edge - a few percent concentration appearing in the subtropics, which
+        # is both physically absurd and visible on the chart as speckle in the open Indian Ocean.
+        # This mask goes to zero well north of the edge, rises through the marginal ice zone so
+        # the edge stays ragged rather than drawn with a ruler, and reaches one inside the pack.
+        edge_zone = smoothstep(-2.0, 1.5, south_of_edge)
+        conc = base + (floes - 0.42 * lead_mask) * edge_zone
 
         # Coastal polynyas emerge where katabatic drainage pushes ice offshore.
         polynya = self._polynya_factor(lat, lon, t_hours)

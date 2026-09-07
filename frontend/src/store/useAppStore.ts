@@ -18,7 +18,7 @@ import type {
 import { DEFAULT_LAYERS, type LayerToggles } from '../map/MapEngine';
 import type { RasterMode } from '../map/layers';
 
-export type ScreenId = 'bridge' | 'planner' | 'forecast' | 'icebergs' | 'analytics';
+export type ScreenId = 'flow' | 'bridge' | 'planner' | 'forecast' | 'icebergs' | 'analytics';
 
 export interface PlannerConfig {
   originId: string;
@@ -104,7 +104,7 @@ interface AppState {
 export const MAX_TICK_HISTORY = 800;
 
 export const useAppStore = create<AppState>((set) => ({
-  screen: 'bridge',
+  screen: 'flow',
   setScreen: (screen) => set({ screen }),
 
   simpleMode: true,

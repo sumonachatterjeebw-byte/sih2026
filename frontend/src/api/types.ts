@@ -33,7 +33,18 @@ export interface HealthResponse {
   uptime_seconds: number;
   model_versions: Record<string, string>;
   data_provenance: Record<string, Provenance>;
-  machine_learning: { available: boolean; reason?: string };
+  machine_learning: { available: boolean; reason?: string; models?: Record<string, unknown> };
+  /** Cache warm-up progress. The server answers immediately; this reports what is still building. */
+  warmup: { state: 'pending' | 'warming' | 'ready' | 'failed'; seconds: number; detail: string };
+  /** Indian Antarctic programme context. Full detail at /api/v1/geo/programme. */
+  programme: {
+    name: string;
+    nodal_agency: string;
+    legal_framework: string;
+    season_window: string;
+    stations_served: string[];
+    detail_url: string;
+  };
   external_network_calls: boolean;
   api_keys_required: boolean;
 }

@@ -11,7 +11,7 @@
  * viewport the user has panned and zoomed; rebuilding that on every tab change would lose their
  * place, and a bridge instrument that forgets where you were looking is an irritating one.
  */
-import { Activity, BarChart3, HelpCircle, Layers, Ship, Snowflake } from 'lucide-react';
+import { Activity, BarChart3, HelpCircle, Layers, Ship, Snowflake, Workflow } from 'lucide-react';
 import { ProvenanceBar } from './components/ProvenanceBar';
 import { Guide } from './components/Guide';
 import { useHealth } from './api/queries';
@@ -19,6 +19,7 @@ import { Analytics } from './screens/Analytics';
 import { BridgeConsole } from './screens/BridgeConsole';
 import { IceForecast } from './screens/IceForecast';
 import { IcebergTracker } from './screens/IcebergTracker';
+import { SystemFlow } from './screens/SystemFlow';
 import { VoyagePlanner } from './screens/VoyagePlanner';
 import { useAppStore, type ScreenId } from './store/useAppStore';
 
@@ -32,6 +33,7 @@ interface Tab {
 
 /** `plain` is the beginner-facing label; `label` is the one an ice navigator would expect. */
 const TABS: Tab[] = [
+  { id: 'flow', label: 'System Flow', plain: 'How it works', icon: Workflow, simple: true },
   { id: 'planner', label: 'Voyage Planner', plain: '1. Plan a route', icon: Layers, simple: true },
   { id: 'bridge', label: 'Bridge Console', plain: '2. Sail it', icon: Ship, simple: true },
   { id: 'forecast', label: 'Ice Forecast', plain: 'Ice forecast', icon: Snowflake, simple: false },
@@ -51,7 +53,7 @@ export function App(): JSX.Element {
   const visibleTabs = simpleMode ? TABS.filter((t) => t.simple) : TABS;
 
   // If the user switches to Simple while on an advanced screen, move them somewhere that exists.
-  const activeScreen: ScreenId = visibleTabs.some((t) => t.id === screen) ? screen : 'planner';
+  const activeScreen: ScreenId = visibleTabs.some((t) => t.id === screen) ? screen : 'flow';
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-ground text-ink">
@@ -125,6 +127,9 @@ export function App(): JSX.Element {
       <ProvenanceBar />
 
       <main className="relative min-h-0 flex-1">
+        <Screen id="flow" active={activeScreen}>
+          <SystemFlow />
+        </Screen>
         <Screen id="bridge" active={activeScreen}>
           <BridgeConsole />
         </Screen>
