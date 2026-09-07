@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src.core.constants import DATA_PROVENANCE
 from src.core.geo import from_epsg3031, haversine_nm, to_epsg3031
+from src.data.expedition import programme_context
 from src.data.icebergs import get_iceberg_catalogue
 from src.data.landmask import coast_clearance_nm, get_land_mask, is_land
 from src.data.stations import default_voyage_legs, get_ports, get_stations, get_waypoint
@@ -83,3 +84,16 @@ def catalogue() -> Dict[str, Any]:
         "icebergs": get_iceberg_catalogue(),
         "provenance": DATA_PROVENANCE["iceberg_catalogue"],
     }
+
+
+@router.get("/programme")
+def programme() -> Dict[str, Any]:
+    """
+    The Indian Antarctic programme: fleet, season, resupply method and legal framework.
+
+    This is programme context rather than model output, and it is what turns a generic polar
+    router into one that answers the actual problem statement. The season window in particular
+    is a hard operational constraint: the sailing window is about 90 days, so a day saved in
+    January is worth far more than the same day saved in principle.
+    """
+    return programme_context()

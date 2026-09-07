@@ -862,27 +862,58 @@ VESSEL_PRESETS: Dict[str, VesselParameters] = {
         n_propellers=1,
         ducted_propeller=True,
     ),
-    # RV Himadri-class polar research vessel. India does not yet operate one: Himadri is the
-    # Indian Arctic station, and the polar research vessel NCPOR has been planning is not built.
-    # Every figure here is therefore a NOTIONAL design in the 100 m ice-capable research-vessel
-    # class, sized on comparable ships, and is labelled so nobody mistakes it for ship's data.
-    "rv_himadri": VesselParameters(
-        name="RV Himadri (notional)",
-        display_name="RV Himadri-class research vessel (notional design)",
-        ice_class=IceClass.PC6,
-        length_m=105.0,
-        waterline_length_m=99.0,        # notional
-        beam_m=19.5,
-        draft_m=6.8,
-        block_coefficient=0.58,         # notional, finer research hull
-        stem_angle_deg=20.0,            # notional, icebreaking bow
-        waterline_angle_deg=24.0,       # notional
-        flare_angle_deg=41.9,           # derived
-        hull_friction_coeff=0.12,
+    # ORV Sagar Nidhi: India's own ice-strengthened research vessel, operated by the National
+    # Institute of Ocean Technology under MoES and built by Fincantieri in 2008. In 2010 she
+    # became the first Indian-owned vessel to reach Antarctica, which is why she belongs in this
+    # list: she is the reference point for what an Indian hull can and cannot do down there.
+    #
+    # Her published capability is navigation in roughly 40 cm of ice. That is thin first-year
+    # ice, so PC7 is the right POLARIS row - and the comparison this preset exists to make is a
+    # blunt one. Run the same passage with her and with the chartered Golovnin and the planner
+    # will refuse ice she cannot enter. That is the argument for a dedicated polar vessel,
+    # expressed as physics rather than as a slide.
+    "sagar_nidhi": VesselParameters(
+        name="ORV Sagar Nidhi",
+        display_name="ORV Sagar Nidhi (NIOT / MoES)",
+        ice_class=IceClass.PC7,
+        length_m=103.6,
+        waterline_length_m=95.0,        # approximate
+        beam_m=18.0,
+        draft_m=5.6,
+        block_coefficient=0.56,         # approximate, fine research hull
+        stem_angle_deg=28.0,            # approximate; ice-strengthened, not an icebreaking bow
+        waterline_angle_deg=30.0,       # approximate
+        flare_angle_deg=46.7,           # derived from the two angles above
+        hull_friction_coeff=0.15,
         propulsion_efficiency=0.60,
         sfoc_g_per_kwh=200.0,
-        installed_power_kw=9000.0,
-        propeller_diameter_m=4.2,       # notional
+        installed_power_kw=5600.0,      # diesel-electric, approximate total propulsion power
+        propeller_diameter_m=3.6,       # approximate
+        n_propellers=2,
+        ducted_propeller=True,
+    ),
+    # The dedicated Polar Research Vessel that NCPOR has long planned and India does not yet
+    # operate. Every figure is NOTIONAL, sized on comparable new-build polar research ships such
+    # as RRS Sir David Attenborough and RV Kronprins Haakon. It is here so the value of the
+    # capability can be quantified before the ship exists: plan the same passage with her and
+    # with the current fleet, and the difference is the business case.
+    "polar_research_vessel": VesselParameters(
+        name="Indian Polar Research Vessel (notional)",
+        display_name="Indian Polar Research Vessel (planned, notional design)",
+        ice_class=IceClass.PC4,
+        length_m=129.0,
+        waterline_length_m=120.0,       # notional
+        beam_m=24.0,
+        draft_m=7.5,
+        block_coefficient=0.60,         # notional
+        stem_angle_deg=21.0,            # notional, true icebreaking bow
+        waterline_angle_deg=25.0,       # notional
+        flare_angle_deg=42.4,           # derived
+        hull_friction_coeff=0.10,       # ice-friendly coating
+        propulsion_efficiency=0.62,
+        sfoc_g_per_kwh=190.0,
+        installed_power_kw=12000.0,     # notional
+        propeller_diameter_m=4.8,       # notional
         n_propellers=2,
         ducted_propeller=True,
     ),

@@ -336,7 +336,20 @@ def test_flare_angle_is_derived_from_stem_and_waterline_angles():
 # Presets and the charting helper
 # --------------------------------------------------------------------------------------
 def test_presets_are_complete_and_distinct():
-    assert set(VESSEL_PRESETS) == {"vasiliy_golovnin", "arc7_resupply", "rv_himadri"}
+    """
+    The fleet is the Indian Antarctic programme's fleet.
+
+    An earlier version carried an invented "RV Himadri-class" preset, which was doubly wrong:
+    India does not operate that ship, and Himadri is the Indian *Arctic* station, not a vessel.
+    It was replaced by ORV Sagar Nidhi, which is real, and by an explicitly notional Polar
+    Research Vessel standing in for the ship India has planned but not built.
+    """
+    assert set(VESSEL_PRESETS) == {
+        "vasiliy_golovnin",
+        "arc7_resupply",
+        "sagar_nidhi",
+        "polar_research_vessel",
+    }
     for preset in VESSEL_PRESETS.values():
         assert isinstance(preset.ice_class, IceClass)
         assert preset.installed_power_kw > 0.0
@@ -344,7 +357,43 @@ def test_presets_are_complete_and_distinct():
         # The stored flare angle must agree with the one Lindqvist derives, or the interface
         # would display a hull geometry the physics does not use.
         assert preset.flare_angle_deg == pytest.approx(preset.lindqvist_flare_angle_deg(), abs=0.6)
-        assert preset.bollard_pull_kn() > 500.0
+        assert preset.bollard_pull_kn() > 200.0
+
+
+def test_notional_hulls_are_labelled_as_notional():
+    """
+    Anything that is not a real ship must say so in its display name.
+
+    This is the guard against the exact mistake that was made once already: presenting an
+    invented vessel alongside real ones with nothing to distinguish them.
+    """
+    for key in ("polar_research_vessel",):
+        assert "notional" in VESSEL_PRESETS[key].display_name.lower()
+    for key in ("vasiliy_golovnin", "sagar_nidhi"):
+        assert "notional" not in VESSEL_PRESETS[key].display_name.lower()
+
+
+def test_indian_fleet_capability_gap_is_reproduced():
+    """
+    The comparison that makes the case for a dedicated Indian polar vessel.
+
+    In heavy ice the ice-strengthened Sagar Nidhi cannot make way, the chartered PC5 manages a
+    crawl, and a PC4 polar research vessel keeps going. If this ordering ever breaks, the
+    argument the README and the slide deck make from it is no longer supported by the model.
+    """
+    heavy_ice_m, concentration = 1.5, 0.6
+
+    def speed(key: str) -> float:
+        v = VESSEL_PRESETS[key]
+        return attainable_speed(v, v.installed_power_kw, heavy_ice_m, concentration)
+
+    sagar = speed("sagar_nidhi")
+    golovnin = speed("vasiliy_golovnin")
+    prv = speed("polar_research_vessel")
+
+    assert sagar == 0.0, "Sagar Nidhi should be beset in 1.5 m ice; she is ice-strengthened, not an icebreaker"
+    assert golovnin > sagar
+    assert prv > golovnin, "a PC4 polar research vessel must outperform the PC5 charter in heavy ice"
 
 
 def test_preset_lookup_copies_and_falls_back():

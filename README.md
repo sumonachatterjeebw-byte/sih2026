@@ -42,6 +42,46 @@ one is good enough to use and two are reported as failures.
 
 ---
 
+## Built for the Indian Antarctic programme, specifically
+
+This is not a generic polar router with Indian place names pasted on. The programme's actual
+constraints are in the model.
+
+**The two stations are supplied in completely different ways, and the router knows it.**
+Maitri sits about 80 km inland on the Schirmacher Oasis — no ship can reach it. Cargo is landed
+on the shelf ice at **India Bay** and hauled inland by convoy. Bharati is coastal but sits behind
+the Prydz Bay fast ice, with the Amery Ice Shelf calving tabular bergs straight into the
+approach. Every destination therefore carries a **validated seaward anchorage**, checked against
+the real coastline at start-up, so the planner can never be handed a destination a ship cannot
+reach.
+
+**The season is a hard constraint.** The window is roughly 90 days, December to March. The
+environment model's reference date is **26 November — the southbound departure, not the February
+ice minimum**. That is deliberate: late November is when the pack is still extensive and the
+routing problem is hardest. Planning against the February minimum would flatter the system.
+
+**The fleet is real, including the gap in it.** Four presets, and the comparison between them is
+an argument India can use. Same passage, 1.5 m ice at 6/10 concentration:
+
+| Vessel | Ice class | Power | Attainable speed |
+| :--- | :--- | ---: | ---: |
+| **ORV Sagar Nidhi** (NIOT / MoES, first Indian vessel to Antarctica, 2010) | PC7 | 5.6 MW | **0.0 kn — beset** |
+| **MV Vasiliy Golovnin** (the ship NCPOR charters) | PC5 | 13.5 MW | 2.6 kn |
+| Arc7 resupply vessel (generic) | Arc7 | 13.0 MW | 4.5 kn |
+| **Indian Polar Research Vessel** (planned, notional) | PC4 | 12.0 MW | **4.2 kn** |
+
+India has no dedicated polar research vessel. This system lets that cost be *measured* rather
+than argued: plan the same passage with each hull and see where the planner refuses to go.
+
+**The legal frame is enforced, not cited.** The Indian Antarctic Act 2022, the Antarctic Treaty
+environmental protocol, and the IMO Polar Code. POLARIS is a hard constraint in the optimiser —
+a route through prohibited ice is not returned at all — and the fuel model is marine gas oil
+throughout, because the Polar Code bans heavy fuel oil carriage.
+
+Full context at `GET /api/v1/geo/programme`.
+
+---
+
 ## Read this first: what is real and what is simulated
 
 This is the part most prototypes are vague about, so it goes at the top.
@@ -67,12 +107,23 @@ data-loader change, not a model change — the interfaces already match the real
 
 ## Quickstart
 
-Two terminals, two commands each.
+**One command:**
+
+```powershell
+.\start.ps1          # Windows
+./start.sh           # macOS, Linux, Git Bash
+```
+
+It installs what is missing, starts the API, waits for it to warm its caches, then starts the
+bridge console. Open **http://localhost:5173**. `.\start.ps1 -Check` runs the verification suite
+instead of serving.
+
+**Or by hand, two terminals:**
 
 ```bash
 # 1. Backend
 pip install -r requirements.txt
-uvicorn src.api.main:app --reload --port 8000        # http://localhost:8000/docs
+uvicorn src.api.main:app --port 8000                 # http://localhost:8000/docs
 
 # 2. Frontend
 cd frontend && npm install && npm run dev            # http://localhost:5173

@@ -13,8 +13,11 @@ and open http://localhost:8000/docs for the interactive schema.
 """
 from __future__ import annotations
 
+import os
+import threading
 import time
-from typing import Any, Dict
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,8 +38,76 @@ from src.api.routers import physics as physics_router
 from src.api.routers import voyages as voyages_router
 
 _STARTED_AT = time.time()
+_WARMUP: Dict[str, Any] = {"state": "pending", "seconds": 0.0, "detail": ""}
+
+
+def _warm_caches() -> None:
+    """
+    Build the expensive process-wide caches before anyone asks for them.
+
+    Three things are slow exactly once: the coast-distance lookup grid (a batched KD-tree query
+    over the coastline), the vessel performance tables (a bisection per thickness/concentration
+    cell), and the iceberg drift tracks. Left lazy, the cost lands on whoever presses the button
+    first - which, at a demonstration, is the person you least want to keep waiting.
+    """
+    started = time.perf_counter()
+    try:
+        from src.core.lindqvist_model import VESSEL_PRESETS
+        from src.core.route_optimizer import get_performance
+        from src.data.landmask import get_coast_field, get_land_mask
+
+        get_land_mask()
+        get_coast_field()
+        for vessel in VESSEL_PRESETS.values():
+            get_performance(vessel, vessel.installed_power_kw)
+
+        _WARMUP.update(state="warming", detail="Caches built; pre-planning the default leg.")
+
+        # Pre-plan the default demonstration leg. This is what actually removes the stall: the
+        # remaining cost is integrating iceberg drift tracks, which are cached per berg and
+        # departure time, so doing it here means the first plan a user asks for is the fast path.
+        # Set POLARNAV_SKIP_WARM_PLAN=1 to skip it on a constrained machine.
+        if os.environ.get("POLARNAV_SKIP_WARM_PLAN") != "1":
+            from src.core.route_optimizer import PolarRouteOptimizer
+            from src.data.stations import resolve_endpoint
+
+            origin = resolve_endpoint("cape_town")
+            dest = resolve_endpoint("bharati")
+            if origin and dest:
+                vessel = VESSEL_PRESETS["vasiliy_golovnin"]
+                PolarRouteOptimizer(
+                    vessel=vessel,
+                    ice_class=vessel.ice_class,
+                    installed_power_kw=vessel.installed_power_kw,
+                ).optimize_route(origin[0], origin[1], dest[0], dest[1])
+
+        _WARMUP.update(
+            state="ready",
+            seconds=round(time.perf_counter() - started, 2),
+            detail=(
+                "Coast-distance grid, vessel performance tables and iceberg drift tracks built. "
+                "The default Cape Town to Bharati plan is now on the fast path."
+            ),
+        )
+    except Exception as exc:  # pragma: no cover - warm-up must never break start-up
+        _WARMUP.update(
+            state="failed",
+            seconds=round(time.perf_counter() - started, 2),
+            detail=f"{type(exc).__name__}: {exc}. Caches will build lazily instead.",
+        )
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """
+    Warm the caches in a worker thread, so the server answers immediately but the first real
+    request does not pay for the lookup tables.
+    """
+    threading.Thread(target=_warm_caches, name="polarnav-warmup", daemon=True).start()
+    yield
+
 
 app = FastAPI(
+    lifespan=_lifespan,
     title=f"{SYSTEM_NAME}: Antarctic Navigation Decision Support",
     description=(
         "Sea-ice forecasting, iceberg drift, IMO POLARIS risk indexing, Lindqvist ice resistance "
@@ -106,9 +177,18 @@ def health() -> Dict[str, Any]:
         "organization": ORGANIZATION,
         "department": DEPARTMENT,
         "uptime_seconds": round(time.time() - _STARTED_AT, 1),
+        "warmup": dict(_WARMUP),
         "model_versions": MODEL_VERSIONS,
         "data_provenance": DATA_PROVENANCE,
         "machine_learning": ml_status,
+        "programme": {
+            "name": "Indian Scientific Expedition to Antarctica (ISEA)",
+            "nodal_agency": "National Centre for Polar and Ocean Research (NCPOR), Goa",
+            "legal_framework": "Indian Antarctic Act, 2022; Antarctic Treaty; IMO Polar Code",
+            "season_window": "Austral summer, December to March",
+            "stations_served": ["Maitri", "Bharati"],
+            "detail_url": "/api/v1/geo/programme",
+        },
         "external_network_calls": False,
         "api_keys_required": False,
     }
