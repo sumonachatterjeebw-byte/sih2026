@@ -590,6 +590,20 @@ export function drawStations(
   ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
   ctx.textBaseline = 'middle';
 
+  // Label decluttering.
+  //
+  // Seven stations sit within a few hundred kilometres of each other along Queen Maud Land and
+  // Prydz Bay - which is precisely the region this system is about - and drawing every label
+  // turned that coastline into an unreadable smear. Claimed rectangles are tracked as labels are
+  // drawn, and a label whose box would collide with one already placed is dropped. Its marker is
+  // always drawn, so nothing disappears from the chart; only the text yields.
+  //
+  // Indian stations are painted first so that when something has to give way, it is never one of
+  // the two the operator actually cares about.
+  const claimed: { x: number; y: number; w: number; h: number }[] = [];
+  const collides = (x: number, y: number, w: number, h: number): boolean =>
+    claimed.some((r) => x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y);
+
   const paint = (
     lat: number,
     lon: number,
@@ -597,6 +611,7 @@ export function drawStations(
     color: string,
     square: boolean,
     dim: boolean,
+    priority = false,
   ): void => {
     const p = vp.lonLatToScreen(lat, lon);
     if (p.x < -80 || p.x > vp.widthPx + 80 || p.y < -30 || p.y > vp.heightPx + 30) return;
@@ -609,6 +624,15 @@ export function drawStations(
       ctx.arc(p.x, p.y, 3.4, 0, TAU);
       ctx.fill();
     }
+
+    const w = ctx.measureText(label).width;
+    const box = { x: p.x + 6, y: p.y - 6, w: w + 4, h: 12 };
+    if (!priority && collides(box.x, box.y, box.w, box.h)) {
+      ctx.globalAlpha = 1;
+      return;
+    }
+    claimed.push(box);
+
     ctx.strokeStyle = 'rgba(7, 11, 18, 0.9)';
     ctx.lineWidth = 3;
     ctx.strokeText(label, p.x + 7, p.y);
@@ -617,8 +641,17 @@ export function drawStations(
     ctx.globalAlpha = 1;
   };
 
-  for (const s of stations) {
-    paint(s.latitude, s.longitude, s.name, s.is_indian ? MAP_COLORS.station : '#64748B', true, !s.is_indian);
+  const ordered = [...stations].sort((a, b) => Number(b.is_indian) - Number(a.is_indian));
+  for (const s of ordered) {
+    paint(
+      s.latitude,
+      s.longitude,
+      s.name,
+      s.is_indian ? MAP_COLORS.station : '#64748B',
+      true,
+      !s.is_indian,
+      Boolean(s.is_indian),
+    );
     if (s.station_is_inland) {
       // The anchorage is where the ship actually goes; show the pair so the difference is
       // visible on the chart rather than buried in a footnote.
