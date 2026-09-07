@@ -23,6 +23,7 @@ import {
 } from '../components/ui';
 import { useRadarSweep } from '../api/queries';
 import { useVoyageSocket } from '../hooks/useVoyageSocket';
+import { Explain } from '../components/Explain';
 import { useScene } from '../hooks/useScene';
 import { bearing, hoursToDhm, num, tenths } from '../lib/format';
 import { besettingColor, rioStatusLabel, severityColor } from '../map/palette';
@@ -39,6 +40,7 @@ export function BridgeConsole(): JSX.Element {
   const setInspect = useAppStore((s) => s.setInspect);
   const setRadar = useAppStore((s) => s.setRadar);
   const setScreen = useAppStore((s) => s.setScreen);
+  const simpleMode = useAppStore((s) => s.simpleMode);
 
   const controller = useVoyageSocket();
   const tick = latestTick(ticks);
@@ -137,10 +139,20 @@ export function BridgeConsole(): JSX.Element {
               </div>
 
               <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between">
+                  <Explain term="rio">
+                    <span className="text-2xs uppercase tracking-[0.12em] text-ink-3">
+                      Ice risk score
+                    </span>
+                  </Explain>
+                  <span className="text-2xs text-ink-3">higher is safer</span>
+                </div>
                 <RioGauge rio={tick.rio} cap={tick.polaris_speed_cap_knots} />
                 <div className="mt-1 text-2xs text-ink-3">
-                  {rioStatusLabel(tick.rio)} — POLARIS ceiling {num(tick.polaris_speed_cap_knots, 1)} kn,
-                  attainable {num(tick.attainable_speed_knots, 1)} kn
+                  {rioStatusLabel(tick.rio)} — speed limit {num(tick.polaris_speed_cap_knots, 1)} kn,{' '}
+                  <Explain term="attainable_speed">
+                    <span>this ship can make {num(tick.attainable_speed_knots, 1)} kn</span>
+                  </Explain>
                 </div>
               </div>
 
@@ -158,12 +170,20 @@ export function BridgeConsole(): JSX.Element {
                   color="#9FB3CC"
                 />
                 <Meter
-                  label="Compression"
+                  label="Ice pressure"
                   value01={tick.compression_index}
                   display={tick.besetting_risk}
                   color={besettingColor(tick.besetting_risk)}
                   warnAbove={0.6}
                 />
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5 text-2xs text-ink-3">
+                  <Explain term="compression">
+                    <span>What is ice pressure?</span>
+                  </Explain>
+                  <Explain term="besetting">
+                    <span>What does beset mean?</span>
+                  </Explain>
+                </div>
               </div>
 
               <div className="mt-3">
@@ -175,7 +195,7 @@ export function BridgeConsole(): JSX.Element {
                 <KeyValue label="Progress" value={num(tick.progress_percent, 1)} unit="%" />
               </div>
 
-              <div className="mt-3 border-t border-hair pt-2">
+              <div className={simpleMode ? 'hidden' : 'mt-3 border-t border-hair pt-2'}>
                 <KeyValue label="Wind" value={`${num(tick.wind_speed_ms, 1)} m/s from ${bearing(tick.wind_dir_from_deg)}`} />
                 <KeyValue label="Sea state" value={num(tick.wave_height_m, 1)} unit="m Hs" />
                 <KeyValue label="Air / sea" value={`${num(tick.air_temp_c, 1)} / ${num(tick.sst_c, 1)}`} unit="°C" />

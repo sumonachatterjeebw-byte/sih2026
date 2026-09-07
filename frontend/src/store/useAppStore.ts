@@ -38,6 +38,14 @@ interface AppState {
   screen: ScreenId;
   setScreen: (s: ScreenId) => void;
 
+  // ---- presentation mode ----
+  // Simple mode is the default. A first-time user gets the two screens that tell the story and
+  // the panels that matter; everything analytical is one toggle away rather than in their face.
+  simpleMode: boolean;
+  setSimpleMode: (v: boolean) => void;
+  guideOpen: boolean;
+  setGuideOpen: (v: boolean) => void;
+
   // ---- planner ----
   planner: PlannerConfig;
   setPlanner: (patch: Partial<PlannerConfig>) => void;
@@ -98,6 +106,12 @@ export const MAX_TICK_HISTORY = 800;
 export const useAppStore = create<AppState>((set) => ({
   screen: 'bridge',
   setScreen: (screen) => set({ screen }),
+
+  simpleMode: true,
+  setSimpleMode: (simpleMode) => set({ simpleMode }),
+  // Shown on first load. Reopened from the Help button in the masthead.
+  guideOpen: true,
+  setGuideOpen: (guideOpen) => set({ guideOpen }),
 
   planner: {
     originId: 'cape_town',

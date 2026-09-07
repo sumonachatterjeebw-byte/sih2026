@@ -24,6 +24,7 @@ import {
   Stat,
   Toggle,
 } from '../components/ui';
+import { Explain } from '../components/Explain';
 import { useScene } from '../hooks/useScene';
 import { hoursToDhm, num, signed } from '../lib/format';
 import { rioColor } from '../map/palette';
@@ -48,6 +49,7 @@ export function VoyagePlanner(): JSX.Element {
   const planError = useAppStore((s) => s.planError);
   const setPhase = useAppStore((s) => s.setPlanPhase);
   const setInspect = useAppStore((s) => s.setInspect);
+  const simpleMode = useAppStore((s) => s.simpleMode);
 
   const [elapsed, setElapsed] = useState(0);
 
@@ -127,16 +129,27 @@ export function VoyagePlanner(): JSX.Element {
               onChange={(v) => setPlanner({ vesselKey: v })}
             />
             <Select
-              label="Ice class for POLARIS"
+              label="Ice class"
               value={planner.iceClass}
               options={ICE_CLASSES.map((c) => ({ value: c, label: c.replace(/_/g, ' ') }))}
               onChange={(v) => setPlanner({ iceClass: v })}
             />
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-2xs text-ink-3">
+              <Explain term="ice_class">
+                <span>What is an ice class?</span>
+              </Explain>
+              <Explain term="polaris">
+                <span>What are the safety rules?</span>
+              </Explain>
+            </div>
           </div>
         </Panel>
 
-        <Panel title="Objective weights" subtitle="What the optimiser is trading off">
-          <div className="space-y-2">
+        <Panel
+          title={simpleMode ? 'Plan the passage' : 'Objective weights'}
+          subtitle={simpleMode ? undefined : 'What the optimiser is trading off'}
+        >
+          <div className={simpleMode ? 'hidden' : 'space-y-2'}>
             <Slider
               label="Fuel"
               value={planner.weights.fuel}
@@ -191,13 +204,14 @@ export function VoyagePlanner(): JSX.Element {
             {phase === 'planning' ? 'Planning…' : 'Plan voyage'}
           </button>
           <p className="mt-1 text-2xs text-ink-3">
-            Two independent searches, then both tracks sailed through identical physics. Takes 15
-            to 30 seconds.
+            {simpleMode
+              ? 'This works out two routes — one that ignores the ice, and one that avoids it — then sails both through the same physics so the difference is real. Takes about 15 seconds.'
+              : 'Two independent searches, then both tracks sailed through identical physics. Takes 15 to 30 seconds.'}
           </p>
           {planError && <ErrorNote message={planError} onRetry={() => void runPlan()} />}
         </Panel>
 
-        {plan?.search && (
+        {plan?.search && !simpleMode && (
           <Panel title="Search diagnostics">
             <KeyValue label="Nodes expanded" value={num(plan.search.nodes_expanded, 0)} />
             <KeyValue label="Rejected: land" value={num(plan.search.nodes_rejected_land, 0)} />
@@ -231,7 +245,7 @@ export function VoyagePlanner(): JSX.Element {
         </div>
 
         <Panel
-          title="Optimised against the ice-blind baseline"
+          title="Recommended route vs the route without ice data"
           subtitle={plan?.savings_method}
           right={plan ? <Badge tone="accent">{plan.vessel_name}</Badge> : undefined}
           className="shrink-0"
@@ -243,6 +257,34 @@ export function VoyagePlanner(): JSX.Element {
             />
           ) : (
             <>
+              <p className="mb-3 rounded-sm border border-hair bg-panel-2 p-2 text-xs2 leading-relaxed text-ink-2">
+                <strong className="text-ink">In plain terms: </strong>
+                the recommended route is{' '}
+                <strong className="text-ink">
+                  {Math.abs(plan.distance_delta_nm).toFixed(0)} nm{' '}
+                  {plan.distance_delta_nm >= 0 ? 'longer' : 'shorter'}
+                </strong>{' '}
+                but arrives{' '}
+                <strong className={plan.time_saved_hours >= 0 ? 'text-ok' : 'text-danger'}>
+                  {hoursToDhm(Math.abs(plan.time_saved_hours))}{' '}
+                  {plan.time_saved_hours >= 0 ? 'sooner' : 'later'}
+                </strong>{' '}
+                and uses{' '}
+                <strong className={plan.fuel_saved_percentage >= 0 ? 'text-ok' : 'text-danger'}>
+                  {Math.abs(plan.fuel_saved_percentage).toFixed(1)}%{' '}
+                  {plan.fuel_saved_percentage >= 0 ? 'less' : 'more'} fuel
+                </strong>
+                . Its worst ice-risk score is{' '}
+                <strong style={{ color: rioColor(plan.optimized?.minimum_rio ?? 0) }}>
+                  {plan.optimized?.minimum_rio}
+                </strong>{' '}
+                against{' '}
+                <strong style={{ color: rioColor(plan.baseline?.minimum_rio ?? 0) }}>
+                  {plan.baseline?.minimum_rio}
+                </strong>{' '}
+                for the ice-blind route — higher is safer.
+              </p>
+
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 <Stat
                   label="Fuel saved"
