@@ -1,0 +1,345 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>POLAR-NAV AI - Prototype Report</title><style>
+@page { size: A4; margin: 16mm 14mm; }
+* { box-sizing: border-box; }
+body {
+  font-family: "Segoe UI", -apple-system, system-ui, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 9.6pt; line-height: 1.5; color: #16202e; margin: 0;
+}
+h1 { font-size: 21pt; margin: 0 0 4pt; letter-spacing: -0.3pt; }
+h2 { font-size: 13pt; margin: 20pt 0 6pt; padding-bottom: 3pt;
+     border-bottom: 1.2pt solid #0e7490; color: #0e5f74; page-break-after: avoid; }
+h3 { font-size: 10.5pt; margin: 12pt 0 4pt; color: #1f3a52; page-break-after: avoid; }
+p, li { margin: 0 0 6pt; }
+ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
+code { font-family: Consolas, "SF Mono", Menlo, monospace; font-size: 8.6pt;
+       background: #eef3f8; padding: 0.5pt 3pt; border-radius: 2pt; }
+pre { font-family: Consolas, Menlo, monospace; font-size: 7.9pt; background: #0d1726; color: #dbe7f3;
+      padding: 8pt 10pt; border-radius: 3pt; line-height: 1.35; overflow-x: hidden;
+      white-space: pre-wrap; page-break-inside: avoid; }
+table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 8.6pt;
+        page-break-inside: avoid; }
+th { background: #e8f0f7; color: #0e5f74; font-weight: 600; text-align: left;
+     padding: 4pt 6pt; border-bottom: 1pt solid #b9cfe0; }
+td { padding: 3.5pt 6pt; border-bottom: 0.5pt solid #dde6ef; vertical-align: top; }
+tr:nth-child(even) td { background: #f7fafd; }
+.ok { color: #197a4b; font-weight: 600; }
+.bad { color: #b02a37; font-weight: 600; }
+.muted { color: #63788f; }
+.cover { border-bottom: 2.5pt solid #0e7490; padding-bottom: 10pt; margin-bottom: 12pt; }
+.sub { font-size: 11pt; color: #34506b; margin: 2pt 0 8pt; }
+.meta { font-size: 8.4pt; color: #63788f; }
+.callout { border-left: 3pt solid #0e7490; background: #f0f7fb; padding: 7pt 10pt;
+           margin: 8pt 0; page-break-inside: avoid; }
+.warn { border-left-color: #c2820a; background: #fdf7e8; }
+.danger { border-left-color: #b02a37; background: #fcf0f1; }
+.grid { display: flex; gap: 8pt; margin: 8pt 0; flex-wrap: wrap; }
+.card { flex: 1 1 22%; border: 0.8pt solid #cddbe8; border-radius: 3pt; padding: 6pt 8pt;
+        background: #fbfdff; }
+.card .k { font-size: 15pt; font-weight: 700; color: #0e5f74; line-height: 1.1; }
+.card .l { font-size: 7.6pt; text-transform: uppercase; letter-spacing: 0.4pt; color: #63788f; }
+.pagebreak { page-break-before: always; }
+footer { margin-top: 18pt; padding-top: 6pt; border-top: 0.8pt solid #cddbe8;
+         font-size: 8pt; color: #63788f; }
+</style></head><body>
+<div class="cover">
+  <div class="meta">SMART INDIA HACKATHON 2026 &nbsp;|&nbsp; PROBLEM STATEMENT 26059</div>
+  <h1>POLAR-NAV AI</h1>
+  <div class="sub">AI-Enabled Antarctic Sea-Ice, Iceberg Trajectory and Navigation Decision Support System</div>
+  <div class="meta">
+    Ministry of Earth Sciences &nbsp;&middot;&nbsp; National Centre for Polar and Ocean Research (NCPOR)<br>
+    Prototype report, version 1.0.0 &nbsp;&middot;&nbsp; generated 07 September 2026, 08:09 UTC
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card"><div class="k">13,318</div><div class="l">lines of Python</div></div>
+  <div class="card"><div class="k">6,048</div><div class="l">lines of TypeScript</div></div>
+  <div class="card"><div class="k">108</div><div class="l">automated tests</div></div>
+  <div class="card"><div class="k">25+</div><div class="l">API endpoints</div></div>
+</div>
+<h2>1. What this is, in one page</h2>
+
+<p>Every austral summer India sends the Indian Scientific Expedition to Antarctica to resupply
+its two stations, <strong>Maitri</strong> and <strong>Bharati</strong>. The sailing window is
+about ninety days. Sea ice decides whether the ships make it, and the ice charts available today
+are largely manual and twelve to twenty-four hours old. Getting it wrong means burning fuel
+ramming ice, missing a relief window, or being beset &mdash; trapped as the ice closes in.</p>
+
+<p>POLAR-NAV AI plans a route through that ice which is safe under the IMO Polar Code, and proves
+the benefit by measuring it. The central design decision is this: <strong>the system plans two
+routes, not one</strong>. It plans the route a ship would sail with no ice information at all,
+and the route it recommends. It then sails <em>both</em> through identical physics. The
+difference between them is the benefit, and because it is a measurement rather than an
+assumption, it is allowed to come out unfavourable &mdash; and sometimes does.</p>
+
+<div class="callout">
+<strong>Why that matters.</strong> The prototype this replaced computed its headline figure as
+<code>baseline = optimised &times; 1.22</code> and reported &ldquo;22% fuel saved&rdquo;. That is
+a constant dressed as a result: it would report the same saving for any ship, any route and any
+ice, including a route that saved nothing at all. Removing it is the single most important change
+in this build.
+</div>
+<h2>2. What is real and what is simulated</h2>
+<p>This is the question every reviewer should ask first, so it is answered before anything else.</p>
+<table><thead><tr><th style="text-align:left">Layer</th><th style="text-align:left">Status</th><th style="text-align:left">Source</th><th style="text-align:left">Note</th></tr></thead><tbody><tr><td style="text-align:left">Coastline</td><td style="text-align:left"><span class="ok">real</span></td><td style="text-align:left">Natural Earth 1:50m physical land (public domain)</td><td style="text-align:left">97 polygons, 1698 vertices, used as the hard land mask.</td></tr><tr><td style="text-align:left">Stations</td><td style="text-align:left"><span class="ok">real</span></td><td style="text-align:left">NCPOR published station coordinates</td><td style="text-align:left">Maitri and Bharati positions are the published values.</td></tr><tr><td style="text-align:left">Iceberg Catalogue</td><td style="text-align:left"><span class="ok">real-seed</span></td><td style="text-align:left">US National Ice Center Antarctic iceberg tracking database</td><td style="text-align:left">Real berg names and calving origins; positions are seeded then propagated by the drift model.</td></tr><tr><td style="text-align:left">Polaris Matrix</td><td style="text-align:left"><span class="ok">real</span></td><td style="text-align:left">IMO MSC.1/Circ.1519 Risk Value tables</td><td style="text-align:left">Transcribed risk values; not simulated.</td></tr><tr><td style="text-align:left">Sea Ice Field</td><td style="text-align:left"><span class="bad">synthetic</span></td><td style="text-align:left">stands in for OSI-SAF OSI-401-b / AMSR2 / Sentinel-1 SAR</td><td style="text-align:left">Physically-shaped seeded field. The models consuming it are real; the field is simulated.</td></tr><tr><td style="text-align:left">Atmosphere Ocean</td><td style="text-align:left"><span class="bad">synthetic</span></td><td style="text-align:left">stands in for ECMWF ERA5/HRES and CMEMS GLOBAL_ANALYSISFORECAST_PHY_001_024</td><td style="text-align:left">Seeded synoptic + climatological forcing. Simulated.</td></tr></tbody></table>
+
+<div class="callout warn">
+<strong>The models are real; the weather is simulated.</strong> The ship physics, the POLARIS
+risk tables, the Antarctic coastline, the geodesy and the iceberg drift equations are genuine.
+The sea-ice, wind, current and wave fields are physically-shaped simulations standing in for
+OSI-SAF, AMSR2, Sentinel-1, ERA5 and Copernicus Marine products. Every API response carrying a
+simulated field sets <code>is_synthetic: true</code> and names the product it replaces.
+All reported skill is therefore <em>simulated-environment</em> skill, and must be described that
+way. Swapping in live data is a data-loader change, not a model change.
+</div>
+<h2 class="pagebreak">3. Measured results</h2>
+<table><thead><tr><th style="text-align:left">Leg</th><th style="text-align:right">Distance (nm)</th><th style="text-align:right">Time (h)</th><th style="text-align:right">Fuel (t)</th><th style="text-align:right">Fuel saved</th><th style="text-align:right">Time saved</th><th style="text-align:right">Min. risk index</th></tr></thead><tbody><tr><td style="text-align:left">Cape Town to Bharati</td><td style="text-align:right">2,853 &rarr; 3,018</td><td style="text-align:right">719 &rarr; <strong>306</strong></td><td style="text-align:right">301 &rarr; 292</td><td style="text-align:right"><span class="ok">+2.84%</span></td><td style="text-align:right"><span class="ok">413 h</span></td><td style="text-align:right">6 &rarr; <strong>12</strong></td></tr><tr><td style="text-align:left">Cape Town to Maitri</td><td style="text-align:right">2,174 &rarr; 2,569</td><td style="text-align:right">664 &rarr; <strong>495</strong></td><td style="text-align:right">239 &rarr; 258</td><td style="text-align:right"><span class="bad">-7.98%</span></td><td style="text-align:right"><span class="ok">169 h</span></td><td style="text-align:right">5 &rarr; <strong>10</strong></td></tr><tr><td style="text-align:left">Hobart to Bharati</td><td style="text-align:right">2,703 &rarr; 2,959</td><td style="text-align:right">432 &rarr; <strong>280</strong></td><td style="text-align:right">302 &rarr; 309</td><td style="text-align:right"><span class="bad">-2.35%</span></td><td style="text-align:right"><span class="ok">151 h</span></td><td style="text-align:right">9 &rarr; <strong>12</strong></td></tr></tbody></table>
+<p class="meta">Each row is two independent optimisations sailed through identical physics. Planning time 11&ndash;64 s per leg on a laptop CPU.</p>
+
+<div class="callout danger">
+<strong>The result we did not expect, and did not hide.</strong> On two of the three legs the safe
+route burns <em>more</em> fuel, because going around the ice adds distance and the distance costs
+more than the ice avoided. Re-weighting the optimiser toward fuel barely moves it: on the Maitri
+leg the penalty stays near 8% whichever way the weights are set, because it is a property of the
+geography and the ice, not of the search.
+<br><br>
+<strong>So the honest headline for this system is time and safety, not fuel.</strong> It saves
+six to seventeen days inside a ninety-day window and improves the worst-case safety margin on
+every single leg. Charter time dominates the cost of a polar resupply, so days are worth more
+than tonnes. The planner emits an explicit warning whenever the recommended route costs more
+fuel, stating that it is being recommended because it is safer, not cheaper.
+</div>
+<h2>4. Built for the Indian programme, specifically</h2>
+
+<p>This is not a generic polar router with Indian place names attached. The programme's real
+constraints are inside the model.</p>
+<h3>The two stations are supplied in completely different ways</h3>
+<ul>
+  <li><strong>Maitri</strong> sits about 80 km inland on the Schirmacher Oasis. No ship can reach
+  it. Cargo is landed on the shelf ice at India Bay and hauled inland by convoy.</li>
+  <li><strong>Bharati</strong> is coastal but sits behind the Prydz Bay fast ice, with the Amery
+  Ice Shelf calving tabular bergs into the approach.</li>
+</ul>
+<p>Every destination therefore carries a <strong>validated seaward anchorage</strong>, checked
+against the real coastline at start-up, so the planner can never be given a destination a ship
+cannot reach.</p>
+
+<h3>The season is a hard constraint</h3>
+<p>Austral summer, roughly December to March. The sailing window is about 90 days. Days saved inside it are days of science, and days lost can mean a station goes unrelieved for a year, so transit time is the metric that matters most to this programme - more than fuel. The environment model's
+reference date is <strong>26 November (day 330), the southbound departure</strong> &mdash; deliberately
+the departure, not the February ice minimum, because late November is when the pack is still
+extensive and the routing problem is hardest.</p>
+
+<h3>The fleet, including the gap in it</h3>
+<table><thead><tr><th style="text-align:left">Vessel</th><th style="text-align:left">Ice class</th><th style="text-align:right">LOA (m)</th><th style="text-align:right">Power (MW)</th><th style="text-align:right">Open water</th><th style="text-align:right">0.6 m ice</th><th style="text-align:right">1.0 m ice</th><th style="text-align:right">1.5 m ice</th></tr></thead><tbody><tr><td style="text-align:left">MV Vasiliy Golovnin (NCPOR charter)</td><td style="text-align:left">PC5</td><td style="text-align:right">167</td><td style="text-align:right">13.5</td><td style="text-align:right">16.8</td><td style="text-align:right">10.3</td><td style="text-align:right">6.2</td><td style="text-align:right">2.6</td></tr><tr><td style="text-align:left">Arc7 resupply vessel (generic)</td><td style="text-align:left">Arc7</td><td style="text-align:right">169</td><td style="text-align:right">13.0</td><td style="text-align:right">16.0</td><td style="text-align:right">11.1</td><td style="text-align:right">7.7</td><td style="text-align:right">4.5</td></tr><tr><td style="text-align:left">ORV Sagar Nidhi (NIOT / MoES)</td><td style="text-align:left">PC7</td><td style="text-align:right">104</td><td style="text-align:right">5.6</td><td style="text-align:right">14.7</td><td style="text-align:right">7.5</td><td style="text-align:right">3.3</td><td style="text-align:right"><span class="bad">beset</span></td></tr><tr><td style="text-align:left">Indian Polar Research Vessel (planned, notional design)</td><td style="text-align:left">PC4</td><td style="text-align:right">129</td><td style="text-align:right">12.0</td><td style="text-align:right">16.2</td><td style="text-align:right">11.1</td><td style="text-align:right">7.5</td><td style="text-align:right">4.2</td></tr></tbody></table>
+<p class="meta">Attainable speed in knots at 6/10 ice concentration, solved from the power and propeller-thrust balance.</p>
+
+<div class="callout">
+<strong>A quantified case for India's own polar vessel.</strong> India has no dedicated polar research vessel. This system lets the consequence be measured rather than argued: plan the same passage with each hull and compare where the planner refuses to go. In 1.5 m ice at 6/10 concentration, Sagar Nidhi cannot make way at all, the chartered Golovnin manages about 2.6 knots, and a notional PC4 polar research vessel manages about 4.2. That difference is the business case, in physics.
+</div>
+
+<h3>The legal frame is enforced, not merely cited</h3>
+<ul>
+<li><strong>Indian Antarctic Act, 2022</strong> &mdash; Domestic law governing Indian activity in Antarctica. Requires a permit for vessel operations and imposes environmental obligations that a route planner has to respect, not merely note.</li>
+<li><strong>Antarctic Treaty and the Protocol on Environmental Protection</strong> &mdash; Antarctic Specially Protected Areas must be avoided or entered only under permit; minimising time spent operating in them is a planning objective.</li>
+<li><strong>IMO Polar Code (MSC.385(94)) and POLARIS (MSC.1/Circ.1519)</strong> &mdash; Sets the operational limits this system enforces as a hard constraint: a route may not be recommended through ice where POLARIS prohibits operation.</li>
+<li><strong>IMO Polar Code heavy fuel oil provisions</strong> &mdash; Antarctic operations run on marine gas oil. The fuel and emissions model in this system is MGO throughout, at 3.206 kg CO2 per kg fuel.</li>
+</ul>
+<h2 class="pagebreak">5. Architecture, top to bottom</h2>
+<pre>
+   SATELLITE AND REANALYSIS INPUTS          (simulated in this prototype)
+   Sentinel-1 SAR | AMSR2 | ERA5 | CMEMS | USNIC iceberg database
+                            |
+                            v
+   DATA LAYER               src/data/
+   Antarctic coastline as a hard land mask (97 polygons, Natural Earth 1:50m)
+   Stations with validated seaward anchorages | Iceberg catalogue | Programme context
+                            |
+                            v
+   PHYSICS CORE             src/core/          (pure functions, no I/O)
+   environment.py    westerlies, katabatic outflow, ACC, synoptic lows
+   sea_ice.py        concentration, Stefan thickness, drift, divergence, forecast
+   polaris_risk.py   IMO MSC.1/Circ.1519 risk index
+   lindqvist_model.py  ice resistance, powering, attainable speed
+   iceberg_tracker.py  RK4 momentum balance, melt, ensembles, closest approach
+   growler_radar.py  X-band PPI with honest misses and false alarms
+   route_optimizer.py  risk-constrained multi-objective A*, twice
+   voyage.py         hour-by-hour simulation, alerting, re-routing
+                            |
+                            v
+   MACHINE LEARNING         src/ml/            (optional; physics never depends on it)
+   Trained forecaster, drift residual corrector, growler classifier
+                            |
+                            v
+   SERVICES                 src/services/
+   SQLite voyage store | GPX / GeoJSON / S-411 export | bandwidth measurement
+                            |
+                            v
+   API                      src/api/           FastAPI, 25+ endpoints + WebSocket
+                            |
+                            v
+   BRIDGE CONSOLE           frontend/          React + custom EPSG:3031 canvas map
+   Plan | Sail | Ice forecast | Icebergs | Analytics
+</pre>
+<p><strong>Dependency direction is strictly one-way.</strong> <code>core</code> depends on
+<code>data</code> and never the reverse; <code>services</code> and <code>api</code> depend on
+<code>core</code>; <code>ml</code> depends on <code>core</code> and <strong>nothing depends on
+<code>ml</code></strong>, so the physics path runs unchanged if no model has ever been trained.</p>
+<h2>6. Technology stack, and why each choice</h2>
+<table><thead><tr><th style="text-align:left">Choice</th><th style="text-align:left">Why this rather than the obvious alternative</th></tr></thead><tbody><tr><td style="text-align:left">Python 3.11</td><td style="text-align:left">The polar science ecosystem (xarray, NetCDF4, GDAL, Copernicus toolboxes) is Python. Ingesting real ERA5 and OSI-SAF products later means staying where those libraries live.</td></tr><tr><td style="text-align:left">FastAPI + Pydantic v2</td><td style="text-align:left">A typed schema and an OpenAPI document for free, so the frontend derives its types from the running server rather than guessing. Native WebSocket support for the live voyage stream.</td></tr><tr><td style="text-align:left">NumPy / SciPy</td><td style="text-align:left">Fields are evaluated on grids of thousands of points. Vectorisation took route planning from 24 s to 15 s and the iceberg ensemble from 109 s to 4 s.</td></tr><tr><td style="text-align:left">scikit-learn, <em>not</em> PyTorch</td><td style="text-align:left">The trained models are tabular and fit in seconds on a CPU. A bridge PC has no GPU. A deep network would add a heavy dependency and an ONNX export step for no measured gain.</td></tr><tr><td style="text-align:left">SQLite</td><td style="text-align:left">The shipboard console is one rugged PC with no infrastructure behind it. A file-backed database with write-ahead logging works there unchanged and at NCPOR headquarters too.</td></tr><tr><td style="text-align:left">React 18 + Vite + TypeScript (strict)</td><td style="text-align:left">Strict typing against generated API types means a backend field rename breaks the build rather than the demonstration.</td></tr><tr><td style="text-align:left">Custom canvas map engine</td><td style="text-align:left">The most important frontend decision. Mapbox, MapLibre and Leaflet all assume Web Mercator, which is unusable at 70&deg;S, and all assume a reachable tile server, which does not exist at sea. The map projects to EPSG:3031 in TypeScript, mirroring the backend exactly, and draws our own model output.</td></tr><tr><td style="text-align:left">Zustand + TanStack Query</td><td style="text-align:left">Server state (slow, cacheable route plans) and client state (layer toggles, playback) are different problems and get different tools.</td></tr></tbody></table>
+<p><strong>Deliberately not used:</strong> no map tile provider, no cloud services, no
+external APIs, no API keys. A clean checkout runs offline, because the target user is on a ship
+below 60&deg;S where there is no geostationary coverage.</p>
+<h2 class="pagebreak">7. The models</h2>
+
+<h3>Sea ice</h3>
+<p>Concentration comes from an ice-edge climatology with an austral seasonal cycle, multi-octave
+noise for floes and leads, and coastal polynyas that <em>emerge</em> where katabatic wind drives
+ice offshore rather than being painted in. The floe pattern is sampled in a drifting frame, so a
+lead is the same lead a day later and tens of kilometres downstream &mdash; which is what makes a
+Lagrangian forecast the physically correct method rather than a decorative one.</p>
+<p><strong>Thickness answers the question every reviewer asks.</strong> Altimeters (CryoSat-2,
+ICESat-2) have narrow swaths and long repeat cycles and cannot support tactical navigation. So
+thickness is derived thermodynamically from accumulated Freezing Degree Days by Stefan's Law,
+saturating near 1.55 m where oceanic heat flux balances conduction through the ice and its snow,
+plus a dynamic ridging term where the drift field converges. Pure Stefan growth diverges as
+&radic;FDD and would wrongly predict 3 to 4 m by late season.</p>
+<p><strong>Divergence is the besetting predictor.</strong> Where the drift field converges, floes
+are driven together, leads close behind the ship and pressure builds against the hull. The route
+cost penalises it and the voyage engine alerts on it.</p>
+
+<h3>Forecast verification &mdash; the number that matters most</h3>
+<p>Any forecast must beat persistence &mdash; &ldquo;assume nothing changes&rdquo; &mdash; or it
+is adding nothing. The forecast never sees the verifying analysis.</p>
+<table><thead><tr><th style="text-align:left">Lead</th><th style="text-align:right">Forecast RMSE</th><th style="text-align:right">Persistence RMSE</th><th style="text-align:right">Skill</th><th style="text-align:right">IIEE</th><th style="text-align:right">Persistence IIEE</th></tr></thead><tbody><tr><td style="text-align:left">24 h</td><td style="text-align:right">0.0813</td><td style="text-align:right">0.0880</td><td style="text-align:right"><span class="ok">+0.076</span></td><td style="text-align:right">0.046</td><td style="text-align:right">0.042</td></tr><tr><td style="text-align:left">48 h</td><td style="text-align:right">0.1096</td><td style="text-align:right">0.1283</td><td style="text-align:right"><span class="ok">+0.146</span></td><td style="text-align:right">0.054</td><td style="text-align:right">0.059</td></tr><tr><td style="text-align:left">72 h</td><td style="text-align:right">0.1260</td><td style="text-align:right">0.1506</td><td style="text-align:right"><span class="ok">+0.164</span></td><td style="text-align:right">0.050</td><td style="text-align:right">0.069</td></tr><tr><td style="text-align:left">120 h</td><td style="text-align:right">0.1377</td><td style="text-align:right">0.1664</td><td style="text-align:right"><span class="ok">+0.173</span></td><td style="text-align:right">0.050</td><td style="text-align:right">0.071</td></tr><tr><td style="text-align:left">168 h</td><td style="text-align:right">0.1522</td><td style="text-align:right">0.1820</td><td style="text-align:right"><span class="ok">+0.164</span></td><td style="text-align:right">0.058</td><td style="text-align:right">0.079</td></tr></tbody></table>
+<p class="meta">Concentration units. Positive skill means the forecast beat persistence. Simulated-environment skill.</p>
+
+<h3>Ship performance &mdash; Lindqvist (1989)</h3>
+<p>Crushing, bending and submergence resistance with the correct velocity corrections, plus
+open-water resistance via the ITTC-1957 line so total resistance stays continuous as thickness
+approaches zero. Four errors in the original transcription of the method were found and fixed,
+including a bending term that was dimensionally wrong and <em>backwards in Young's modulus</em>,
+making stiffer ice easier to break.</p>
+<p><strong>Speed is an output, never an assumption.</strong> Every route segment solves the lower
+of the power balance and the propeller thrust balance. The thrust limit binds in heavy ice, and
+ignoring it silently assumes a propeller that keeps open-water efficiency down to bollard
+conditions, which no propeller does.</p>
+
+<h3>Iceberg drift</h3>
+<p>Fourth-order Runge-Kutta on the momentum balance
+<code>(M + M&#8336;) dv/dt = F_air + F_water + F_coriolis + F_pressure + F_wave</code>, with
+deterioration by basal turbulent melt, buoyant convection and wave erosion, and perturbed
+ensembles giving 50 and 90 percent positional uncertainty per lead time. The timestep is derived
+per berg from its own drag response timescale.</p>
+
+<h3>Near-field radar</h3>
+<p>A simulated X-band plan-position indicator whose honesty is the point: it reports what it
+<em>missed</em>. In a representative pack-ice sweep there are 39 real targets, 13 are painted and
+26 go undetected, one of them inside the three-mile alert perimeter. Growler detection range
+collapses from 3.0 nm in calm water to 0.6 nm in saturated clutter.</p>
+<h2 class="pagebreak">8. Machine learning: what was trained, and what failed</h2>
+<p class="meta">Trained full run, 252 s wall time, scikit-learn 1.3.2. Every figure is in <code>models/metrics.json</code>.</p>
+<table><thead><tr><th style="text-align:left">Model</th><th style="text-align:left">Task</th><th style="text-align:left">Result</th><th style="text-align:left">Used?</th></tr></thead><tbody><tr><td style="text-align:left">Growler / clutter classifier</td><td style="text-align:left">Real ice target vs sea-clutter false alarm</td><td style="text-align:left">F1 <span class="ok">0.989</span>, ROC-AUC 0.999, against 0.701 for an SNR threshold</td><td style="text-align:left"><span class="ok">Yes</span></td></tr><tr><td style="text-align:left">Sea-ice concentration forecaster</td><td style="text-align:left">Concentration at +24 to +168 h</td><td style="text-align:left">Test RMSE 0.105; skill vs persistence <span class="bad">-0.006</span>, vs physics <span class="bad">-0.072</span>, vs climatology <span class="ok">+0.285</span></td><td style="text-align:left"><span class="bad">No</span></td></tr><tr><td style="text-align:left">Iceberg drift residual corrector</td><td style="text-align:left">Velocity error of the physics model</td><td style="text-align:left">72 h position error 6.95 km &rarr; 6.86 km; mean +1.3%, median <span class="bad">-12.9%</span></td><td style="text-align:left"><span class="bad">No</span></td></tr></tbody></table>
+
+<div class="callout danger">
+<strong>Two of the three trained models do not beat the physics they were meant to improve, and
+are not used.</strong> This is reported rather than hidden, because a system claiming three
+working AI engines when one works is a system nobody should trust with a ship.
+<br><br>
+<strong>Why they fail, honestly.</strong> The training data is generated by this repository's own
+physics environment. The synthetic ice field's patterns are <em>produced</em> by advection, so a
+semi-Lagrangian back-trajectory is close to the exact inverse of the generating process and no
+gradient-boosted tree on tabular features will beat it in its own world. The iceberg
+&ldquo;observations&rdquo; are generated by perturbing the same momentum balance being corrected,
+leaving the residual close to unstructured noise. On real Copernicus rasters and real USNIC
+tracks &mdash; where the true dynamics are far richer and the physics has genuine systematic bias
+&mdash; these are exactly the places a learned model earns its keep, which is why the pipeline is
+built and kept.
+<br><br>
+The classifier works because separating a small ice target from a clutter spike is genuinely
+multivariate: aspect ratio alone carries 46% of the feature importance, and no single threshold
+can use it.
+</div>
+<p><strong>Splits are time-based with an embargo, never random.</strong> Nearby samples share the
+same underlying noise field, so a random split would leak the answer and report a fictitious
+score.</p>
+<h2>9. Constraints the system is built around</h2>
+<table><thead><tr><th style="text-align:left">Constraint</th><th style="text-align:left">How the build answers it</th></tr></thead><tbody><tr><td style="text-align:left">No geostationary coverage below 60&deg;S</td><td style="text-align:left">Contours and deltas instead of rasters. <strong>Measured</strong> at 23.4 KB/day against a 50 KB Iridium Certus budget &mdash; both payloads are built, gzipped and the byte counts read, not estimated.</td></tr><tr><td style="text-align:left">Polar night and cloud for months</td><td style="text-align:left">Reliance on C-band SAR and passive microwave, unaffected by darkness or cloud. No optical product is in the critical path.</td></tr><tr><td style="text-align:left">Regulation forbids unapproved software in a certified ECDIS</td><td style="text-align:left">The console runs on separate hardware and exports GPX 1.1, GeoJSON and an S-411-shaped ice overlay over the ship's LAN, loaded read-only. The S-411 output is explicitly a representative subset, not a certified encoding.</td></tr><tr><td style="text-align:left">No GPU on a ship's bridge</td><td style="text-align:left">Every model is CPU-only. The heaviest training run completes in about four minutes on a laptop.</td></tr><tr><td style="text-align:left">A lead can close in under an hour</td><td style="text-align:left">Drift-field divergence gives a compression index; convergent regimes are penalised in the route cost and raise an alert under way.</td></tr><tr><td style="text-align:left">Growlers are invisible to satellites</td><td style="text-align:left">A separate near-field radar layer that reports its own misses rather than implying complete detection.</td></tr><tr><td style="text-align:left">The forecast will be wrong on arrival</td><td style="text-align:left">The voyage engine resamples conditions at the ship's actual arrival time and re-plans from the present position when a hard constraint is violated.</td></tr><tr><td style="text-align:left">Ice thickness cannot be measured tactically</td><td style="text-align:left">Thermodynamic derivation from Freezing Degree Days plus dynamic ridging, as operational ice services do.</td></tr><tr><td style="text-align:left">A demonstration must not stall</td><td style="text-align:left">Caches are warmed at start-up in a worker thread. The first plan a user waits for dropped from 29 s to 11.7 s, and the server answers immediately.</td></tr></tbody></table>
+<h2 class="pagebreak">10. Engineering: performance, and the bugs it exposed</h2>
+<table><thead><tr><th style="text-align:left">Problem</th><th style="text-align:left">Fix</th><th style="text-align:left">Result</th></tr></thead><tbody><tr><td style="text-align:left">Land test in the A* inner loop</td><td style="text-align:left">Bounding-box reject plus a memo cache on the quantised lattice</td><td style="text-align:left">25,000 queries/s</td></tr><tr><td style="text-align:left">Coast distance on gridded fields</td><td style="text-align:left">One batched KD-tree query into a bilinear lookup grid</td><td style="text-align:left">200k samples in 67 ms</td></tr><tr><td style="text-align:left">Ice model re-requesting static coast geometry</td><td style="text-align:left">Cache keyed on grid content, plus 48-hour forecast slices</td><td style="text-align:left">planning 24 s &rarr; 15 s</td></tr><tr><td style="text-align:left">Attainable speed per A* edge</td><td style="text-align:left">Tabulate over thickness and concentration, then interpolate</td><td style="text-align:left">about 1000&times;</td></tr><tr><td style="text-align:left">Iceberg ensemble integration</td><td style="text-align:left">Vectorise the ensemble; refresh forcing every 30 simulated minutes</td><td style="text-align:left">109 s &rarr; 4 s</td></tr><tr><td style="text-align:left">Voyage tick</td><td style="text-align:left">Reuse the sampled state in the radar sweep; refresh the berg check on an interval</td><td style="text-align:left">2340 ms &rarr; 169 ms</td></tr><tr><td style="text-align:left">Cold start before the first plan</td><td style="text-align:left">Warm caches and pre-plan the default leg at start-up, in a worker thread</td><td style="text-align:left">29 s &rarr; 11.7 s</td></tr></tbody></table>
+
+<h3>Three defects worth recording, because they were correctness bugs, not slow code</h3>
+<ol>
+<li><strong>The iceberg integrator diverged to NaN for small bergs.</strong> A fixed timestep is
+stable for a giant tabular berg whose drag response time is many hours, but a growler responds in
+minutes; the velocity oscillated and blew up within a simulated day. The timestep is now derived
+per berg from its own response timescale.</li>
+<li><strong>The planner certified routes that beset the ship.</strong> The route optimiser
+inverted the power curve directly while the voyage engine used the full thrust-limited solver, so
+the planner was systematically optimistic. Two components disagreeing about the same physics is
+worse than either being wrong alone. Both now call one function.</li>
+<li><strong>Iceberg avoidance tested the wrong position.</strong> Keep-out zones used each berg's
+position at departure, but a tabular berg drifts tens of kilometres a day. On a 300-hour passage
+a route planned clear of D-30A still passed 3.0 nm from the <em>centre</em> of a 32 km berg
+&mdash; that is inside it. Exclusion zones now follow each berg's forecast track, interpolated to
+the ship's arrival time. The closest approach went from 3.0 nm to 160 nm.</li>
+</ol>
+<h2>11. Honest limitations</h2>
+
+<ol>
+<li><strong>Environmental fields are synthetic.</strong> All skill figures are
+simulated-environment figures and must be described that way.</li>
+<li><strong>Two of three trained models lose to their physics baselines</strong> and are not in
+the serving path.</li>
+<li><strong>Route optimality is approximate in time.</strong> Edge costs depend on arrival time;
+each node carries the arrival time of the best path found so far. This is standard in operational
+weather routing but is a label-correcting approximation, not a proof of optimality.</li>
+<li><strong>Forecasts clamp at 240 hours.</strong> Longer passages fall back to climatology in
+their later legs &mdash; correct, since nobody can forecast ice thirty days out, but it means
+very slow baseline routes are evaluated against climatology late on.</li>
+<li><strong>The S-411 export is not certified.</strong> It is a representative attribute subset;
+conformance requires an S-100 exchange set and validation against the IHO feature catalogue.</li>
+<li><strong>Hull angles, block coefficients and fuel consumption are engineering estimates</strong>,
+marked as such in the source. Principal dimensions and installed power are published figures.</li>
+<li><strong>The 15&ndash;22% fuel reduction in the original blueprint is not reproduced.</strong>
+That figure came from the literature, not from this system.</li>
+<li><strong>No authentication or multi-tenancy.</strong> It is a single-console prototype.</li>
+</ol>
+<h2>12. How to run and verify it</h2>
+<pre>
+# One command
+.\start.ps1                    (Windows)      ./start.sh          (macOS, Linux)
+
+# Or by hand
+pip install -r requirements.txt
+uvicorn src.api.main:app --port 8000          &rarr; http://localhost:8000/docs
+cd frontend &amp;&amp; npm install &amp;&amp; npm run dev      &rarr; http://localhost:5173
+
+# Verify
+python -m pytest tests/ -q                    &rarr; 108 passed
+python -m src.cli                             &rarr; the whole system in a terminal
+python -m scripts.train                       &rarr; retrain every model
+</pre>
+<p>The README contains a six-step verification walkthrough giving the expected output of each
+check, so a reviewer can tell the difference between &ldquo;it started&rdquo; and &ldquo;it
+works&rdquo;.</p>
+<h2>13. Standards and references</h2>
+
+<p><strong>Standards and law:</strong> IMO MSC.385(94) Polar Code &middot; IMO MSC.1/Circ.1519
+POLARIS &middot; IHO S-411 sea-ice product specification &middot; Indian Antarctic Act, 2022.</p>
+<p><strong>Data products the production system would ingest:</strong> EUMETSAT OSI SAF OSI-401-b
+&middot; AMSR2 (JAXA GCOM-W1) / University of Bremen ASI &middot; ESA Sentinel-1 GRD EW &middot;
+ECMWF ERA5 and HRES &middot; Copernicus Marine GLOBAL_ANALYSISFORECAST_PHY_001_024 &middot; US
+National Ice Center Antarctic iceberg database.</p>
+<p><strong>Literature:</strong> Lindqvist (1989), POAC &middot; Bigg et al. (1997), <em>Cold
+Regions Science and Technology</em> &middot; Rackow et al. (2017), <em>JGR Oceans</em> &middot;
+El-Tahan et al. (1987) &middot; Timco &amp; Weeks (2010) &middot; Andersson et al. (2021),
+<em>Nature Communications</em> (IceNet) &middot; Anderson (1961), <em>Journal of Glaciology</em>.</p>
+
+<footer>
+POLAR-NAV AI v1.0.0 &middot; generated 07 September 2026, 08:09 UTC &middot;
+Python 3.11.9 &middot; coastline: 97 polygons,
+1698 vertices.<br>
+Every figure in this report was computed when the report was generated. Regenerate with
+<code>python -m scripts.make_report</code>.
+</footer></body></html>

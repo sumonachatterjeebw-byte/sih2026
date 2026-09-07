@@ -132,6 +132,14 @@ cd frontend && npm install && npm run dev            # http://localhost:5173
 No API keys. No map tile provider. No network calls at runtime. It runs on a laptop in
 aeroplane mode, which is the point: the target user is on a ship below 60°S.
 
+**Want the whole thing in one document?**
+**[docs/report/POLAR-NAV-AI-Prototype-Report.pdf](docs/report/POLAR-NAV-AI-Prototype-Report.pdf)**
+is a 12-page report covering the architecture, the technology choices and why each was made, the
+constraints the system is built around, every measured result, the machine learning including the
+two models that failed, and the honest limitations. Regenerate it with
+`python -m scripts.make_report` — every figure in it is computed at generation time, so it cannot
+drift out of step with the code.
+
 Presenting this to someone? **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)** is a five-minute
 walkthrough with the numbers, the order to show them in, and the questions worth rehearsing.
 
