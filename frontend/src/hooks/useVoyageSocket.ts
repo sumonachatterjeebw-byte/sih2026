@@ -58,7 +58,21 @@ export function useVoyageSocket(): VoyageController {
 
       ws.onopen = () => {
         setConnected(true);
-        setVoyagePhase('ready');
+        // A button labelled "Start voyage" has to start the voyage.
+        //
+        // Creating the voyage and opening the socket used to leave the ship sitting at the
+        // departure point until the operator found the separate Play control. After a 30-second
+        // wait for the optimisation, that reads as a hang rather than as a step completing, and
+        // in testing the interface it looked exactly like a broken socket. Ticking now begins as
+        // soon as the socket is up; Pause and Step behave as before.
+        setVoyagePhase('running');
+        ws.send(
+          JSON.stringify({
+            action: 'start',
+            tick_hours: useAppStore.getState().tickHours,
+            interval_ms: useAppStore.getState().intervalMs,
+          }),
+        );
       };
 
       ws.onmessage = (event: MessageEvent<string>) => {
@@ -74,6 +88,8 @@ export function useVoyageSocket(): VoyageController {
             break;
           case 'tick':
             pushTick(frame.payload);
+            // A tick is proof the stream is live, whatever the phase said before.
+            if (useAppStore.getState().voyagePhase !== 'running') setVoyagePhase('running');
             break;
           case 'alert':
             pushAlert(frame.payload);

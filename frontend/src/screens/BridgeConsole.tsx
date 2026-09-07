@@ -125,7 +125,22 @@ export function BridgeConsole(): JSX.Element {
           subtitle={voyage ? `${voyage.vessel_name} — ${voyage.ice_class}` : 'No voyage'}
           right={
             <Badge tone={running ? 'ok' : started ? 'caution' : 'neutral'}>
-              {voyage?.status ?? 'IDLE'}
+              {/*
+                Show the LIVE phase, not the status stamped on the voyage when it was created.
+                That field says PLANNED and is never revised by a tick, so the badge read
+                "PLANNED" while the ship was visibly two thousand miles down the track.
+              */}
+              {tick?.is_beset
+                ? 'BESET'
+                : running
+                  ? 'UNDER WAY'
+                  : phase === 'paused'
+                    ? 'PAUSED'
+                    : phase === 'done'
+                      ? 'ARRIVED'
+                      : started
+                        ? (voyage?.status ?? 'PLANNED')
+                        : 'IDLE'}
             </Badge>
           }
         >
