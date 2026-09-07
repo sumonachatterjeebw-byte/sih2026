@@ -52,6 +52,11 @@ export function MapCanvas({
 
     const apply = (): void => {
       const rect = host.getBoundingClientRect();
+      // Refuse to size the backing store from a degenerate measurement. A hidden or
+      // not-yet-laid-out host reports zero, and committing that leaves a blank chart that no
+      // later resize necessarily corrects, because ResizeObserver does not fire when an element
+      // merely becomes visible again.
+      if (rect.width < 2 || rect.height < 2) return;
       engine.resize(rect.width, rect.height, window.devicePixelRatio || 1);
     };
     apply();
@@ -150,7 +155,11 @@ export function MapCanvas({
   );
 
   return (
-    <div ref={hostRef} className={`relative overflow-hidden ${className ?? ''}`}>
+    // h-full w-full is load-bearing, not decoration. The canvas inside is absolutely positioned,
+    // so it contributes nothing to this element's layout height; without an explicit height the
+    // host collapses to zero, the backing store is sized 1 px tall, and the chart renders blank
+    // on every screen while the surrounding panel still looks perfectly correct.
+    <div ref={hostRef} className={`relative h-full w-full overflow-hidden ${className ?? ''}`}>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 touch-none select-none"
