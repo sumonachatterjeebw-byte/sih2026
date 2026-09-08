@@ -1,24 +1,30 @@
 # Python
+#
+# These are ANCHORED to the repository root with a leading slash, deliberately.
+# Unanchored, a pattern like `lib/` matches at ANY depth - and it did: it silently excluded
+# frontend/src/lib/, so the format helpers that eight components import were never committed and
+# nobody could build the frontend from a clean clone. The same trap applies to build/, dist/,
+# var/ and parts/, all of which are plausible directory names inside a web project.
 __pycache__/
 *.py[cod]
 *.class
 *.so
 .Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+/env/
+/venv/
+/ENV/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 *.egg-info/
 .installed.cfg
 *.egg
