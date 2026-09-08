@@ -109,14 +109,28 @@ data-loader change, not a model change — the interfaces already match the real
 
 ### Prerequisites
 
-| | Version | Check with |
-| :--- | :--- | :--- |
-| Python | 3.11 or newer | `python --version` |
-| Node.js | 18 or newer | `node --version` |
+| | Version | Check with | If missing |
+| :--- | :--- | :--- | :--- |
+| Python | 3.11 or newer | `python --version` | [python.org/downloads](https://www.python.org/downloads/) |
+| Node.js | 18 or newer | `node --version` | [nodejs.org](https://nodejs.org/) |
+| Git | any | `git --version` | [git-scm.com](https://git-scm.com/) |
 
-Nothing else. **No API keys, no accounts, no map tile provider, no cloud services.** It runs on a
-laptop in aeroplane mode, which is the point: the target user is on a ship below 60°S where there
-is no connectivity to depend on.
+Nothing else. **No API keys, no accounts, no map tile provider, no cloud services, no database
+server, no Docker, no GPU.** It runs on a laptop in aeroplane mode, which is the point: the target
+user is on a ship below 60°S where there is no connectivity to depend on.
+
+> On some systems Python is `python3` and pip is `pip3`. If `python --version` prints nothing or
+> reports Python 2, use `python3` and `pip3` throughout.
+
+### Clone and run
+
+```bash
+git clone https://github.com/sumonachatterjeebw-byte/sih2026.git
+cd sih2026
+```
+
+Then take Option A or Option B below. Both have been verified from a clean clone on a machine
+with nothing installed but Python and Node.
 
 ### Option A — one command
 
@@ -156,6 +170,22 @@ Then open **http://localhost:5173**.
 
 > Add `--reload` to the uvicorn command while developing. Without it the server keeps running the
 > code it started with, and edits to Python files will not take effect until you restart it.
+
+**If a port is already taken**, use different ones. The frontend reads the backend location from
+`frontend/vite.config.ts`, so change it there if you move the API:
+
+```bash
+uvicorn src.api.main:app --port 8001        # then set BACKEND in frontend/vite.config.ts
+npm run dev -- --port 5174                  # the console can move freely
+```
+
+**To let others on your network reach it**, bind to all interfaces and share your machine's LAN
+address:
+
+```bash
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+npm run dev -- --host
+```
 
 ### What to expect on first run
 
@@ -319,6 +349,10 @@ alerts.
 | PowerShell refuses to run `start.ps1` | Execution policy. Use `powershell -ExecutionPolicy Bypass -File .\start.ps1`, or start the two servers by hand. |
 | `/health` says the ML models are not trained | Expected on a fresh clone; the binaries are not committed. Run `python -m scripts.train`, or ignore it — the physics path does not use them. |
 | The map area is blank | Should not happen; it was a real bug and is fixed. If it recurs, check the browser console and confirm the canvas has a non-zero height. |
+| `Cannot find module '../lib/format'` when building | You are on a clone from before this was fixed. `git pull`. A stray `lib/` rule in `.gitignore` used to exclude `frontend/src/lib/` from the repository. |
+| `npm install` reports vulnerabilities | Development-only dependencies of the build tooling. They do not ship in the bundle. Do not run `npm audit fix --force`; it will upgrade Vite across a major version and break the build. |
+| `'python' is not recognized` | Use `python3` and `pip3`, or add Python to PATH. On Windows the Microsoft Store build sometimes registers only `python3`. |
+| Port 5173 already in use | Vite will pick the next free port and print it. Use whatever it prints. |
 
 ---
 
