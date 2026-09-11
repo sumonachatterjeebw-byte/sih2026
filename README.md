@@ -354,6 +354,29 @@ alerts.
 | `'python' is not recognized` | Use `python3` and `pip3`, or add Python to PATH. On Windows the Microsoft Store build sometimes registers only `python3`. |
 | Port 5173 already in use | Vite will pick the next free port and print it. Use whatever it prints. |
 
+## Deploying it somewhere other people can open
+
+The system deploys as a single container serving both the FastAPI backend and the built React console from one origin, with no CORS setup or external dependencies.
+
+> **Do not try to host the backend on Vercel Serverless Functions.** The Python dependencies total 262 MB against a 250 MB limit, the live voyage stream requires WebSockets which serverless functions do not support, voyage simulation state is held in process memory, and dual-route planning takes ~32 seconds of CPU.
+
+### Deploy to Render (Free, recommended)
+
+1. Sign in to [Render](https://render.com) with GitHub.
+2. Click **New +** &rarr; **Blueprint**.
+3. Select this repository. Render detects `render.yaml`, builds the container, and assigns a permanent public HTTPS URL.
+
+### Run with Docker on any host
+
+```bash
+docker build -t polar-nav .
+docker run -p 8000:8000 polar-nav
+```
+
+Open `http://localhost:8000`.
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for architecture details, resource requirements, free-tier cold-start notes, and the split-deployment option.
+
 ---
 
 ## What the system actually does

@@ -1,8 +1,9 @@
 /**
  * Thin fetch client for the POLAR-NAV AI service.
  *
- * Every call goes through the Vite dev proxy at /api, so the browser never talks to a
- * third-party host. There are no keys, no CDNs and no tile servers anywhere in this app.
+ * Calls are same-origin by default. VITE_API_BASE_URL must be set at build time when the
+ * two halves are hosted separately.
+ * There are no keys, no CDNs and no tile servers anywhere in this app.
  */
 import type {
   BandwidthReport,
@@ -29,7 +30,13 @@ import type {
   VoyageState,
 } from './types';
 
-export const API_BASE = '/api/v1';
+/** API origin, or '' for same-origin. Baked in at build time by Vite. */
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
+
+export const API_BASE = `${API_ORIGIN}/api/v1`;
+
+/** True when the bundle is pointed at a different host than the one serving it. */
+export const IS_CROSS_ORIGIN = API_ORIGIN !== '';
 
 export class ApiError extends Error {
   constructor(
@@ -230,6 +237,11 @@ export const exportUrl = (voyageId: string, fmt: 'geojson' | 'gpx' | 'csv' | 's4
 
 /** The WebSocket lives under the same /api/v1 prefix as the REST routes. */
 export function voyageSocketUrl(voyageId: string): string {
+  const path = `/api/v1/ws/voyage/${encodeURIComponent(voyageId)}`;
+  if (API_ORIGIN) {
+    // Deployed split: derive the socket scheme from the API's own scheme, not the page's.
+    return `${API_ORIGIN.replace(/^http/, 'ws')}${path}`;
+  }
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${window.location.host}${API_BASE}/ws/voyage/${encodeURIComponent(voyageId)}`;
+  return `${scheme}://${window.location.host}${path}`;
 }

@@ -19,11 +19,8 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict
 
-from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
 from src.core.constants import (
     DATA_PROVENANCE,
@@ -140,17 +137,21 @@ app.include_router(navigation_router.router)
 app.include_router(voyages_router.router)
 
 
-_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-if (_FRONTEND_DIST / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
-
-
 @app.get("/", tags=["meta"])
 def read_root(request: Request) -> Any:
-    """Service identity. If opened in a browser and frontend is built, serve the bridge console."""
-    accept = request.headers.get("accept", "")
-    if "text/html" in accept and (_FRONTEND_DIST / "index.html").is_file():
-        return FileResponse(str(_FRONTEND_DIST / "index.html"))
+    """
+    Service identity, or the bridge console.
+
+    Two callers want different things from `/`. An API client - including the v0.1 test suite -
+    expects the identity JSON, and that contract is kept. A browser in a single-container
+    deployment expects the application. Rather than break either, the response is negotiated on
+    the Accept header: browsers ask for text/html and get the console, everything else gets JSON.
+    """
+    if _frontend_dist() is not None and "text/html" in request.headers.get("accept", ""):
+        from fastapi.responses import FileResponse
+
+        return FileResponse(_frontend_dist() / "index.html")
+
     return {
         "system": f"{SYSTEM_NAME} Decision Support System",
         "problem_statement_id": PROBLEM_STATEMENT_ID,
@@ -159,16 +160,7 @@ def read_root(request: Request) -> Any:
         "version": SYSTEM_VERSION,
         "docs_url": "/docs",
         "health_url": "/api/v1/health",
-        "console_url": "/console" if (_FRONTEND_DIST / "index.html").is_file() else None,
     }
-
-
-@app.get("/console", tags=["meta"], include_in_schema=False)
-def console() -> Any:
-    """Direct route to the bridge console UI."""
-    if (_FRONTEND_DIST / "index.html").is_file():
-        return FileResponse(str(_FRONTEND_DIST / "index.html"))
-    return {"error": "Frontend build not found. Run 'npm run build' inside frontend/"}
 
 
 @app.get("/api/v1/health", tags=["meta"])
@@ -214,6 +206,51 @@ def health() -> Dict[str, Any]:
     }
 
 
+# --------------------------------------------------------------------------------------
+# Serve the built bridge console, when one has been built.
+#
+# This is what makes a deployment a single service rather than two. With the frontend served by
+# the API, everything is same-origin: no CORS configuration to get wrong, and no build-time
+# variable telling the bundle where its backend lives.
+#
+# It is mounted LAST so that every API route above wins the match, and it is skipped entirely
+# when frontend/dist is absent - which is the normal case in development, where Vite serves the
+# console itself on port 5173.
+# --------------------------------------------------------------------------------------
+def _frontend_dist():
+    """The built console directory, or None when it has not been built."""
+    from pathlib import Path
+
+    dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    return dist if (dist / "index.html").is_file() else None
+
+
+def _mount_frontend() -> None:
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    dist = _frontend_dist()
+    if dist is None:
+        return
+
+    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        """
+        Serve a real file when one exists, otherwise the app shell.
+
+        A single-page app owns its own routing, so any unmatched path has to return index.html
+        rather than a 404 - except under /api, where a 404 is the correct and useful answer.
+        """
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404, detail=f"No such endpoint: /{path}")
+        candidate = dist / path
+        if path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(dist / "index.html")
+
+
 @app.get("/api/v1/visualize/antarctica-grid", tags=["meta"])
 def antarctica_grid() -> Dict[str, Any]:
     """
@@ -254,3 +291,7 @@ def antarctica_grid() -> Dict[str, Any]:
             }
         )
     return {"type": "FeatureCollection", "features": features}
+
+
+# Declared last: the catch-all must not shadow the API routes above.
+_mount_frontend()

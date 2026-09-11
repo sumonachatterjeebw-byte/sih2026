@@ -1,0 +1,24 @@
+# Keep the build context small and the image reproducible.
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# The frontend is built inside the image from source; never copy a local build or node_modules.
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+
+# Not needed at runtime.
+tests/
+docs/
+presentation/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+models/*.joblib
+*.md
+!README.md
