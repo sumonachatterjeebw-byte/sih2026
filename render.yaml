@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: polar-nav-ai
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 10000
+    healthCheckPath: /api/v1/health
