@@ -78,3 +78,7 @@ models/*.joblib
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Binaries
+cloudflared.exe
+

@@ -19,8 +19,11 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict
 
-from fastapi import FastAPI
+from pathlib import Path
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from src.core.constants import (
     DATA_PROVENANCE,
@@ -137,9 +140,17 @@ app.include_router(navigation_router.router)
 app.include_router(voyages_router.router)
 
 
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if (_FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+
+
 @app.get("/", tags=["meta"])
-def read_root() -> Dict[str, Any]:
-    """Service identity. The v0.1 response shape is preserved."""
+def read_root(request: Request) -> Any:
+    """Service identity. If opened in a browser and frontend is built, serve the bridge console."""
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and (_FRONTEND_DIST / "index.html").is_file():
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
     return {
         "system": f"{SYSTEM_NAME} Decision Support System",
         "problem_statement_id": PROBLEM_STATEMENT_ID,
@@ -148,7 +159,16 @@ def read_root() -> Dict[str, Any]:
         "version": SYSTEM_VERSION,
         "docs_url": "/docs",
         "health_url": "/api/v1/health",
+        "console_url": "/console" if (_FRONTEND_DIST / "index.html").is_file() else None,
     }
+
+
+@app.get("/console", tags=["meta"], include_in_schema=False)
+def console() -> Any:
+    """Direct route to the bridge console UI."""
+    if (_FRONTEND_DIST / "index.html").is_file():
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
+    return {"error": "Frontend build not found. Run 'npm run build' inside frontend/"}
 
 
 @app.get("/api/v1/health", tags=["meta"])

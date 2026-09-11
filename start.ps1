@@ -22,8 +22,22 @@ Write-Host ""
 Write-Host "  POLAR-NAV AI  |  SIH 2026 PS-26059  |  MoES / NCPOR" -ForegroundColor White
 Write-Host "  ---------------------------------------------------" -ForegroundColor DarkGray
 
+# --- ensure installed tools are in PATH ---------------------------------------------
+$toolPaths = @(
+    "$env:LOCALAPPDATA\Programs\Python\Python311",
+    "$env:LOCALAPPDATA\Programs\Python\Python311\Scripts",
+    "$env:LOCALAPPDATA\Programs\nodejs"
+)
+foreach ($p in $toolPaths) {
+    if (Test-Path $p) {
+        $env:Path = "$p;$env:Path"
+    }
+}
+
+$npmExe = if (Get-Command "npm.cmd" -ErrorAction SilentlyContinue) { "npm.cmd" } else { "npm" }
+
 # --- prerequisites -------------------------------------------------------------------
-foreach ($tool in @('python', 'npm')) {
+foreach ($tool in @('python', $npmExe)) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
         Write-Host "  Missing prerequisite: $tool" -ForegroundColor Red
         Write-Host "  Install Python 3.11+ and Node 18+, then run this again."
@@ -37,7 +51,7 @@ if (-not $SkipInstall) {
     python -m pip install -q -r requirements.txt
     if (-not (Test-Path "frontend/node_modules")) {
         Say "Installing frontend dependencies (first run only, takes a minute)..."
-        Push-Location frontend; npm install --silent; Pop-Location
+        Push-Location frontend; & $npmExe install --silent; Pop-Location
     }
 }
 
@@ -82,7 +96,7 @@ Write-Host ""
 
 try {
     Push-Location frontend
-    npm run dev
+    & $npmExe run dev
 } finally {
     Pop-Location
     if ($backend -and -not $backend.HasExited) {

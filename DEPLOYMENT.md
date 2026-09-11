@@ -22,7 +22,22 @@ Then open:
 
 ## Deployment Options
 
-### Option 1: Railway (Recommended — Easiest)
+### Option 0: Instant Public HTTPS URL (Zero Setup, Free)
+
+Start the unified fullstack application and expose it worldwide with full HTTPS and WebSocket support:
+
+```bash
+# 1. Build frontend and start backend
+cd frontend && npm run build && cd ..
+uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+# 2. In another terminal, run quick tunnel
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+
+Provides an instant `https://<random-subdomain>.trycloudflare.com` URL with free SSL, WebSocket streaming, and zero configuration.
+
+### Option 1: Railway (Recommended — Easiest Cloud Host)
 
 Railway auto-detects and deploys from the `railway.json` configuration.
 
